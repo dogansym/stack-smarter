@@ -26,6 +26,20 @@
       <div class="score"><span>SCORE</span><strong id="score">0000</strong></div>
     </section>
 
+    <section id="siteReadout" class="site-readout" aria-label="Site conditions" hidden>
+      <div class="readout-block wind-readout">
+        <span class="readout-label">SITE WEATHER · DRY 16°C</span>
+        <div class="readout-value"><i id="windArrow" class="wind-arrow" aria-hidden="true">↑</i><strong id="windValue">FROM NW · 3.2 M/S</strong></div>
+        <div id="gustMeter" class="gust-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="readout-divider" aria-hidden="true"></div>
+      <div class="readout-block prize-readout">
+        <span class="readout-label">PRIZE LIFT</span>
+        <strong id="prizeProgress">12 FLOORS TO GO</strong>
+        <small>LAND THE GOLD MODULE</small>
+      </div>
+    </section>
+
     <div id="feedback" class="feedback" aria-live="assertive"></div>
 
     <section id="startScreen" class="screen start-screen">
@@ -36,6 +50,7 @@
         <p class="eyebrow">SYMETRI × BIM WORLD COPENHAGEN</p>
         <h1>STACK<br><span>SMARTER</span></h1>
         <p class="lede">Build higher. Place smarter.<br>How far can you take it?</p>
+        <p class="prize-teaser"><i aria-hidden="true"></i> LAND THE GOLD MODULE AT LEVEL 12</p>
         <button id="playButton" class="primary-button" type="button"><span>PLAY</span><i aria-hidden="true">→</i></button>
         <p class="tap-hint">TAP ANYWHERE TO DROP</p>
       </div>
@@ -51,6 +66,11 @@
           <div><span>FLOORS</span><strong id="finalFloors">0</strong></div>
         </div>
         <p id="bestLine" class="best-line">BEST 0 · 0 FLOORS</p>
+        <div id="prizeResult" class="prize-result" hidden>
+          <span>PRIZE UNLOCKED</span>
+          <strong>YOU LANDED THE GOLD LIFT</strong>
+          <small>Show this screen to the Symetri team.</small>
+        </div>
         <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
       </div>
     </section>

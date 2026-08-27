@@ -2,6 +2,8 @@
 
 A mobile-first Three.js Symetri arcade game created for BIM World Copenhagen.
 
+Read the simulated site wind, compensate for the hanging load and land the gold prize module at floor 12.
+
 ## Run locally
 
 Serve this directory with any static web server, for example:

@@ -6,14 +6,17 @@ const ui = {
   start: $('#startScreen'), over: $('#gameOverScreen'), hud: $('#hud'),
   floors: $('#floors'), score: $('#score'), multiplier: $('#multiplier'),
   finalScore: $('#finalScore'), finalFloors: $('#finalFloors'), best: $('#bestLine'),
-  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton')
+  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'),
+  siteReadout: $('#siteReadout'), windArrow: $('#windArrow'), windValue: $('#windValue'),
+  gustMeter: $('#gustMeter'), prizeProgress: $('#prizeProgress'), prizeResult: $('#prizeResult')
 };
 
 const C = {
   paper: 0xf1efe9, glacier: 0x43aec4, pale: 0xc9eaf0, ink: 0x171918,
   concrete: 0xb8b6af, concreteTop: 0xd1cfc8, steel: 0x444a4a, glass: 0x84bcc5,
-  white: 0xe9e8e3, soil: 0xd7d3ca
+  white: 0xe9e8e3, soil: 0xd7d3ca, gold: 0xc7a354
 };
+const PRIZE_FLOOR = 12;
 const UP = new THREE.Vector3(0, 1, 0);
 const clock = new THREE.Clock();
 
@@ -22,7 +25,9 @@ let towerTop = 0.42, swingTime = 0, swingSpeed = 1.18, falling = null;
 let blocks = [], bodies = [], particles = [];
 let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
 let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
-let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0;
+let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0, windSock = null;
+let prizeUnlocked = false;
+let wind = { speed: 3.2, fromAngle: Math.PI * 1.75, vector: new THREE.Vector3(0.7, 0, 0.7), label: 'NW' };
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.paper);
@@ -66,6 +71,8 @@ function createMaterials() {
     white: new THREE.MeshStandardMaterial({ color: C.white, roughness: 0.66 }),
     glacier: new THREE.MeshStandardMaterial({ color: C.glacier, roughness: 0.48, metalness: 0.08 }),
     glacierDark: new THREE.MeshStandardMaterial({ color: 0x278da1, roughness: 0.5 }),
+    gold: new THREE.MeshStandardMaterial({ color: C.gold, roughness: 0.3, metalness: 0.72 }),
+    goldDark: new THREE.MeshStandardMaterial({ color: 0x8d6b25, roughness: 0.38, metalness: 0.62 }),
     steel: new THREE.MeshStandardMaterial({ color: C.steel, roughness: 0.38, metalness: 0.72, map: steelMap }),
     steelDark: new THREE.MeshStandardMaterial({ color: C.ink, roughness: 0.34, metalness: 0.62 }),
     glass: new THREE.MeshPhysicalMaterial({ color: C.glass, roughness: 0.17, metalness: 0.12, transparent: true, opacity: 0.83, transmission: 0.08 }),
@@ -129,10 +136,32 @@ function buildSite() {
   createFence(8.8, -1.5, 8.5, Math.PI / 2);
   createContainer(8.1, 0.85, -4.1);
   createPallet(-3.8, 0, -4.5);
+  createWindSock(4.8, -4.7);
   createCitySilhouette();
   const workSign = imagePlane(workTexture, 3.2, 0.47, false);
   workSign.position.set(0, 1.36, -5.72);
   world.add(workSign);
+}
+
+function createWindSock(x, z) {
+  const group = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 3.1, 10), materials.steelDark);
+  pole.position.y = 1.55;
+  pole.castShadow = true;
+  group.add(pole);
+  const arm = box(0.6, 0.045, 0.045, materials.steelDark);
+  arm.position.set(0.26, 3.04, 0);
+  group.add(arm);
+  windSock = new THREE.Group();
+  const sock = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.15, 14, 1, true), materials.glacier);
+  sock.rotation.z = -Math.PI / 2;
+  sock.position.x = 0.6;
+  sock.castShadow = true;
+  windSock.add(sock);
+  windSock.position.set(0.55, 3.02, 0);
+  group.add(windSock);
+  group.position.set(x, 0, z);
+  world.add(group);
 }
 
 function createFence(x, z, length, rotation) {
@@ -294,6 +323,7 @@ function createFoundation() {
 }
 
 function spawnLoad(preview = false) {
+  setWind(preview);
   const type = chooseType(), dims = dimensionsFor(type), object = createElement(type, dims);
   loadSerial++;
   craneY = Math.max(13, towerTop + 10.6);
@@ -305,9 +335,12 @@ function spawnLoad(preview = false) {
   };
   structure.add(object);
   updateLoadTransform();
+  updatePrizeUI();
+  if (!preview && mode === 'playing') playCraneCue();
 }
 
 function chooseType() {
+  if (floors + 1 === PRIZE_FLOOR) return 'prize';
   if ((floors + 1) % 8 === 0) return 'smart';
   return ['slab', 'module', 'beam', 'facade'][floors % 4];
 }
@@ -318,7 +351,30 @@ function dimensionsFor(type) {
   if (type === 'beam') return { w: 5.3 * jitter, h: 0.62, d: 2.15 };
   if (type === 'facade') return { w: 4.95 * jitter, h: 1.05, d: 2.72 };
   if (type === 'smart') return { w: 5.05, h: 1.05, d: 2.9 };
+  if (type === 'prize') return { w: 5.15, h: 1.18, d: 2.92 };
   return { w: 5.18 * jitter, h: 0.52, d: 3.02 };
+}
+
+function setWind(preview = false) {
+  const directions = [
+    ['N', 0], ['NE', Math.PI * 0.25], ['E', Math.PI * 0.5], ['SE', Math.PI * 0.75],
+    ['S', Math.PI], ['SW', Math.PI * 1.25], ['W', Math.PI * 1.5], ['NW', Math.PI * 1.75]
+  ];
+  const selected = preview ? directions[7] : directions[Math.floor(Math.random() * directions.length)];
+  const speed = preview ? 3.2 : 1.4 + Math.random() * Math.min(4.3, 2.8 + floors * 0.09);
+  const fromAngle = selected[1];
+  wind = {
+    label: selected[0], fromAngle, speed,
+    vector: new THREE.Vector3(Math.sin(fromAngle + Math.PI), 0, Math.cos(fromAngle + Math.PI)).normalize()
+  };
+  updateWeatherUI();
+}
+
+function updateWeatherUI() {
+  ui.windValue.textContent = `FROM ${wind.label} · ${wind.speed.toFixed(1)} M/S`;
+  ui.windArrow.style.transform = `rotate(${wind.fromAngle + Math.PI}rad)`;
+  const activeBars = Math.max(1, Math.ceil(wind.speed / 1.15));
+  [...ui.gustMeter.children].forEach((bar, index) => bar.classList.toggle('active', index < activeBars));
 }
 
 function createElement(type, dims) {
@@ -378,6 +434,22 @@ function createElement(type, dims) {
         group.add(mullion);
       }
     }
+  } else if (type === 'prize') {
+    group.add(bevelBox(dims.w, dims.h, dims.d, 0.055, materials.gold));
+    for (let x = -dims.w / 2 + 0.14; x <= dims.w / 2 - 0.14; x += dims.w / 10) {
+      const rib = box(0.035, dims.h * 0.82, dims.d + 0.04, materials.goldDark);
+      rib.position.set(x, 0, 0);
+      group.add(rib);
+    }
+    const darkBand = box(dims.w * 0.92, dims.h * 0.45, dims.d + 0.065, materials.goldDark);
+    darkBand.position.y = -0.02;
+    group.add(darkBand);
+    const logo = imagePlane(logoTexture, 1.68, 0.648, false);
+    logo.position.set(-dims.w * 0.2, 0, dims.d / 2 + 0.055);
+    group.add(logo);
+    const prizeText = textPlane('GOLD LIFT · LEVEL 12', 2.05, 0.38, '#ffffff');
+    prizeText.position.set(dims.w * 0.22, 0, dims.d / 2 + 0.06);
+    group.add(prizeText);
   } else {
     group.add(bevelBox(dims.w, dims.h, dims.d, 0.07, materials.glacier));
     const inset = box(dims.w * 0.83, dims.h * 0.5, dims.d + 0.035, materials.glacierDark);
@@ -413,7 +485,7 @@ function releaseLoad() {
   falling.avx = Math.cos(swingTime * 1.42) * 0.15;
   falling.avy = Math.sin(swingTime) * 0.1;
   falling.avz = Math.cos(swingTime * 1.18 + falling.phase) * 0.24;
-  playTone(150, 0.07, 'triangle', 0.04);
+  playRelease();
 }
 
 function landLoad() {
@@ -427,12 +499,16 @@ function landLoad() {
   const tilt = Math.min(0.18, (Math.abs(f.object.rotation.x) + Math.abs(f.object.rotation.z)) * 0.25);
   const accuracy = THREE.MathUtils.clamp(1 - normalizedOffset - tilt, 0, 1);
   const perfect = accuracy > 0.91 && supportRatio > 0.88;
+  const nearPerfect = !perfect && accuracy > 0.77 && supportRatio > 0.7;
   f.state = 'placed';
   f.y = towerTop + f.h / 2;
   f.object.position.set(f.x, f.y, f.z);
   f.object.rotation.x *= 0.22;
   f.object.rotation.z *= 0.22;
-  f.object.userData.impact = { elapsed: 0, baseY: f.y, strength: 0.11 + Math.min(0.11, Math.abs(f.vy) * 0.018) };
+  f.object.userData.impact = {
+    elapsed: 0, baseY: f.y, baseX: f.x, baseZ: f.z, baseRotZ: f.object.rotation.z,
+    strength: 0.11 + Math.min(0.11, Math.abs(f.vy) * 0.018), near: nearPerfect || perfect
+  };
   blocks.push({ object: f.object, x: f.x, z: f.z, w: f.w, d: f.d, h: f.h, centerY: f.y, type: f.type });
   towerTop += f.h;
   floors++;
@@ -443,7 +519,17 @@ function landLoad() {
     instability = Math.max(0, instability - 0.12);
     showFeedback(combo > 1 ? `PERFECT DROP · ×${multiplier}` : 'PERFECT DROP', true);
     spawnParticles(f.x, towerTop + 0.05, f.z, C.glacier, 20, 1.35);
+    spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 1.25);
     playChord(590 + combo * 22);
+  } else if (nearPerfect) {
+    combo = 0;
+    multiplier = 1;
+    score += Math.round(102 + accuracy * 48 + floors * 3);
+    instability += Math.max(0.015, (1 - supportRatio) * 0.12);
+    showFeedback(`ALMOST PERFECT · ${Math.round(accuracy * 100)}%`, 'near');
+    spawnParticles(f.x, towerTop + 0.03, f.z, C.glacier, 17, 1.05);
+    spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 1);
+    playNearPerfect(accuracy);
   } else {
     combo = 0;
     multiplier = 1;
@@ -454,7 +540,17 @@ function landLoad() {
     spawnParticles(f.x, towerTop, f.z, 0xb3aea4, 13, 0.72);
     playImpact(accuracy);
   }
-  shake = 0.065 + (1 - accuracy) * 0.12;
+  if (f.type === 'prize') {
+    prizeUnlocked = true;
+    const wins = Number(localStorage.getItem('stack-smarter-prize-wins') || 0) + 1;
+    localStorage.setItem('stack-smarter-prize-wins', String(wins));
+    score += 1200;
+    showFeedback('PRIZE UNLOCKED', 'prize');
+    spawnParticles(f.x, towerTop + 0.2, f.z, C.gold, 42, 2.3);
+    spawnImpactRing(f.x, towerTop + 0.04, f.z, C.gold, 1.8);
+    playPrize();
+  }
+  shake = nearPerfect || perfect ? 0.15 : 0.065 + (1 - accuracy) * 0.12;
   impactFlash = 1;
   swingSpeed = Math.min(2.75, 1.18 + floors * 0.072);
   cameraTargetY = Math.max(3.4, towerTop + 1.6);
@@ -525,8 +621,8 @@ function updateLoad(dt) {
     lastLoadX = f.x;
     const trolleyX = Math.sin(swingTime * swingSpeed + f.phase) * range;
     const pendulum = Math.sin(swingTime * swingSpeed * 1.34 + f.phase + 0.52);
-    f.x = trolleyX - pendulum * (0.38 + floors * 0.006);
-    f.z = Math.sin(swingTime * 1.63 + f.phase) * (0.25 + Math.min(0.22, floors * 0.009));
+    f.x = trolleyX - pendulum * (0.38 + floors * 0.006) + wind.vector.x * wind.speed * 0.022;
+    f.z = Math.sin(swingTime * 1.63 + f.phase) * (0.25 + Math.min(0.22, floors * 0.009)) + wind.vector.z * wind.speed * 0.022;
     f.y = craneY - f.cable - f.h / 2 + Math.abs(pendulum) * 0.045;
     f.object.rotation.z = -pendulum * (0.09 + Math.min(0.07, floors * 0.003));
     f.object.rotation.x = Math.cos(swingTime * 1.58 + f.phase) * 0.045;
@@ -534,6 +630,8 @@ function updateLoad(dt) {
     craneParts.trolley.position.x = trolleyX;
   } else if (f.state === 'drop') {
     f.vy -= 9.8 * dt;
+    f.vx += wind.vector.x * wind.speed * 0.115 * dt;
+    f.vz += wind.vector.z * wind.speed * 0.115 * dt;
     f.x += f.vx * dt;
     f.y += f.vy * dt;
     f.z += f.vz * dt;
@@ -568,14 +666,30 @@ function updateImpacts(dt) {
     const impact = block.object.userData.impact;
     if (!impact) return;
     impact.elapsed += dt;
-    block.object.position.y = impact.baseY + Math.sin(impact.elapsed * 24) * Math.exp(-impact.elapsed * 8.5) * impact.strength;
-    if (impact.elapsed > 0.75) { block.object.position.y = impact.baseY; delete block.object.userData.impact; }
+    const damping = Math.exp(-impact.elapsed * (impact.near ? 6.6 : 8.5));
+    block.object.position.y = impact.baseY + Math.sin(impact.elapsed * 24) * damping * impact.strength;
+    if (impact.near) {
+      block.object.position.x = impact.baseX + Math.sin(impact.elapsed * 18) * damping * 0.075;
+      block.object.position.z = impact.baseZ + Math.cos(impact.elapsed * 16) * damping * 0.035;
+      block.object.rotation.z = impact.baseRotZ + Math.sin(impact.elapsed * 21) * damping * 0.026;
+    }
+    if (impact.elapsed > 0.9) {
+      block.object.position.set(impact.baseX, impact.baseY, impact.baseZ);
+      block.object.rotation.z = impact.baseRotZ;
+      delete block.object.userData.impact;
+    }
   });
 }
 
 function updateParticles(dt) {
   particles.forEach(p => {
     p.life -= dt;
+    if (p.ring) {
+      const progress = 1 - Math.max(0, p.life) / p.duration;
+      p.mesh.scale.setScalar(0.65 + progress * p.growth);
+      p.mesh.material.opacity = Math.max(0, p.life / p.duration) * 0.58;
+      return;
+    }
     p.velocity.y -= 3.4 * dt;
     p.mesh.position.addScaledVector(p.velocity, dt);
     p.mesh.rotation.x += p.spin.x * dt;
@@ -605,6 +719,16 @@ function spawnParticles(x, y, z, color, count, force) {
   }
 }
 
+function spawnImpactRing(x, y, z, color, growth) {
+  const geometry = new THREE.RingGeometry(0.65, 0.71, 48);
+  const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.58, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(x, y, z);
+  effects.add(mesh);
+  particles.push({ mesh, ring: true, growth, life: 0.58, duration: 0.58 });
+}
+
 function updateCamera(dt) {
   cameraFocusY = THREE.MathUtils.damp(cameraFocusY, cameraTargetY, 3.4, dt);
   const mobile = innerWidth < 700;
@@ -626,11 +750,14 @@ function startGame() {
   score = floors = combo = 0;
   multiplier = 1;
   instability = 0;
+  prizeUnlocked = false;
   swingTime = 0;
   swingSpeed = 1.18;
   loadSerial = 0;
   ui.start.hidden = true;
   ui.over.hidden = true;
+  ui.prizeResult.hidden = true;
+  ui.siteReadout.hidden = false;
   ui.hud.classList.add('visible');
   resetStructure();
   updateUI();
@@ -640,6 +767,7 @@ function showGameOver() {
   if (mode !== 'collapse') return;
   mode = 'over';
   ui.hud.classList.remove('visible');
+  ui.siteReadout.hidden = true;
   const previousScore = Number(localStorage.getItem('stack-smarter-best') || 0);
   const previousFloors = Number(localStorage.getItem('stack-smarter-best-floors') || 0);
   const bestScore = Math.max(previousScore, score), bestFloors = Math.max(previousFloors, floors);
@@ -648,6 +776,7 @@ function showGameOver() {
   ui.finalScore.textContent = score.toLocaleString();
   ui.finalFloors.textContent = floors;
   ui.best.textContent = score > previousScore || floors > previousFloors ? `NEW BEST · ${bestScore.toLocaleString()} · ${bestFloors} FLOORS` : `BEST ${bestScore.toLocaleString()} · ${bestFloors} FLOORS`;
+  ui.prizeResult.hidden = !prizeUnlocked;
   ui.over.hidden = false;
 }
 
@@ -655,14 +784,27 @@ function updateUI() {
   ui.floors.textContent = floors;
   ui.score.textContent = String(score).padStart(4, '0');
   ui.multiplier.textContent = `×${multiplier}`;
+  updatePrizeUI();
 }
 
-function showFeedback(text, perfect) {
+function updatePrizeUI() {
+  if (prizeUnlocked) {
+    ui.prizeProgress.textContent = 'PRIZE SECURED';
+  } else if (falling?.type === 'prize') {
+    ui.prizeProgress.textContent = 'GOLD LIFT IN AIR';
+  } else {
+    const remaining = Math.max(0, PRIZE_FLOOR - floors);
+    ui.prizeProgress.textContent = `${remaining} ${remaining === 1 ? 'FLOOR' : 'FLOORS'} TO GO`;
+  }
+}
+
+function showFeedback(text, style = false) {
   ui.feedback.textContent = text;
   ui.feedback.className = 'feedback';
   void ui.feedback.offsetWidth;
   ui.feedback.classList.add('show');
-  if (perfect) ui.feedback.classList.add('perfect');
+  if (style === true) ui.feedback.classList.add('perfect');
+  else if (style) ui.feedback.classList.add(style);
 }
 
 function animate() {
@@ -674,6 +816,10 @@ function animate() {
   updatePhysics(dt);
   updateParticles(dt);
   updateCamera(dt);
+  if (windSock) {
+    windSock.rotation.y = THREE.MathUtils.damp(windSock.rotation.y, Math.atan2(-wind.vector.z, wind.vector.x), 4, dt);
+    windSock.rotation.z = Math.sin(swingTime * (4 + wind.speed * 0.4)) * 0.035;
+  }
   impactFlash = Math.max(0, impactFlash - dt * 5);
   renderer.toneMappingExposure = 1.04 + impactFlash * 0.045;
   renderer.render(scene, camera);
@@ -747,7 +893,7 @@ function textPlane(text, width, height, color) {
 }
 
 function elementLabel(type) {
-  return ({ slab: 'CONCRETE SLAB', module: 'PREFAB MODULE', beam: 'STEEL FRAME', facade: 'FAÇADE ELEMENT', smart: 'SMART MODULE' })[type];
+  return ({ slab: 'CONCRETE SLAB', module: 'PREFAB MODULE', beam: 'STEEL FRAME', facade: 'FAÇADE ELEMENT', smart: 'SMART MODULE', prize: 'GOLD PRIZE LIFT' })[type];
 }
 
 function initAudio() {
@@ -769,6 +915,37 @@ function playTone(frequency, duration, type = 'sine', volume = 0.03, delay = 0) 
   oscillator.stop(now + duration + 0.02);
 }
 
+function playNoise(duration, volume, frequency, filterType = 'bandpass', delay = 0) {
+  if (!soundOn) return;
+  initAudio();
+  const rate = audioContext.sampleRate;
+  const buffer = audioContext.createBuffer(1, Math.ceil(rate * duration), rate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 0.35);
+  const source = audioContext.createBufferSource(), filter = audioContext.createBiquadFilter(), gain = audioContext.createGain();
+  const now = audioContext.currentTime + delay;
+  source.buffer = buffer;
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(frequency, now);
+  filter.Q.value = filterType === 'bandpass' ? 0.75 : 0.3;
+  gain.gain.setValueAtTime(volume, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  source.connect(filter).connect(gain).connect(audioContext.destination);
+  source.start(now);
+}
+
+function playRelease() {
+  playTone(185, 0.075, 'square', 0.024);
+  playTone(820, 0.045, 'triangle', 0.018, 0.018);
+  playNoise(0.34, 0.022 + wind.speed * 0.0015, 480 + wind.speed * 85, 'bandpass', 0.025);
+}
+
+function playCraneCue() {
+  playTone(112, 0.18, 'triangle', 0.018);
+  playTone(168, 0.12, 'sine', 0.012, 0.07);
+  playNoise(0.16, 0.009, 620, 'bandpass');
+}
+
 function playChord(base) {
   playTone(base, 0.16, 'sine', 0.038);
   playTone(base * 1.25, 0.18, 'sine', 0.028, 0.045);
@@ -778,12 +955,26 @@ function playChord(base) {
 function playImpact(accuracy) {
   playTone(95 + accuracy * 45, 0.12, 'triangle', 0.055);
   playTone(310 + accuracy * 130, 0.05, 'sine', 0.016, 0.018);
+  playNoise(0.13, 0.034, 180, 'lowpass');
+}
+
+function playNearPerfect(accuracy) {
+  playNoise(0.16, 0.03, 220, 'lowpass');
+  playTone(420 + accuracy * 80, 0.16, 'sine', 0.036);
+  playTone(630 + accuracy * 90, 0.22, 'triangle', 0.026, 0.055);
+  playTone(840, 0.12, 'sine', 0.014, 0.105);
+}
+
+function playPrize() {
+  playNoise(0.22, 0.028, 260, 'lowpass');
+  [523, 659, 784, 1047].forEach((note, index) => playTone(note, 0.34, index < 2 ? 'triangle' : 'sine', 0.034, index * 0.09));
 }
 
 function playCollapse() {
   playTone(78, 0.8, 'sawtooth', 0.075);
   playTone(52, 1.05, 'triangle', 0.065, 0.14);
   playTone(122, 0.45, 'square', 0.018, 0.08);
+  playNoise(1.1, 0.055, 135, 'lowpass');
 }
 
 function updateSoundButton() {
