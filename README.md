@@ -3,7 +3,7 @@
 A mobile-first Three.js Symetri arcade game created for BIM World Copenhagen.
 
 Read the simulated site wind, compensate for the hanging load and secure bronze at floor 15, silver at floor 20 and gold at floor 30.
-The round-based wind monitor, animated skyline turbines and progressive camera pullback make long towers readable without adding extra controls.
+The round-based wind monitor, height-dependent wind exposure, animated skyline turbines and progressive camera pullback make long towers readable without adding extra controls.
 
 ## Run locally
 

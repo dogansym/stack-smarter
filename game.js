@@ -398,13 +398,22 @@ function setWind(preview = false) {
   updateWeatherUI();
 }
 
+function heightWindMultiplier() {
+  if (mode === 'start') return 1;
+  return 1 + Math.min(floors, 40) * 0.014;
+}
+
 function updateWeatherUI() {
   const degrees = Math.round(THREE.MathUtils.radToDeg(wind.fromAngle)) % 360;
+  const heightMultiplier = heightWindMultiplier();
+  const exposedSpeed = wind.baseSpeed * heightMultiplier;
+  const exposure = Math.round((heightMultiplier - 1) * 100);
   ui.windValue.textContent = `FROM ${wind.label} · ${degrees}°`;
-  ui.windSpeed.textContent = wind.baseSpeed.toFixed(1);
-  ui.windState.textContent = `${wind.calm ? 'LIGHT AIR' : 'STEADY FLOW'} · DRY 16°C`;
+  ui.windSpeed.textContent = exposedSpeed.toFixed(1);
+  const flowLabel = floors >= 20 ? 'HIGH-RISE FLOW' : floors >= 8 ? 'EXPOSED FLOW' : wind.calm ? 'LIGHT AIR' : 'STEADY FLOW';
+  ui.windState.textContent = exposure > 0 ? `${flowLabel} · +${exposure}% AT HEIGHT` : `${flowLabel} · DRY 16°C`;
   ui.windArrow.style.transform = `rotate(${wind.fromAngle + Math.PI}rad)`;
-  const activeBars = Math.max(1, Math.ceil(wind.baseSpeed / 1.3));
+  const activeBars = Math.max(1, Math.ceil(exposedSpeed / 1.7));
   [...ui.gustMeter.children].forEach((bar, index) => bar.classList.toggle('active', index < activeBars));
 }
 
@@ -907,6 +916,7 @@ function createResultCelebration(count, awardType = null) {
 function updateUI() {
   ui.floors.textContent = floors;
   ui.score.textContent = String(score).padStart(4, '0');
+  updateWeatherUI();
   updatePrizeUI();
 }
 
@@ -940,9 +950,11 @@ function showFeedback(text, style = false) {
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.034);
   swingTime += dt;
-  const slowGust = Math.sin(swingTime * 0.52 + wind.gustPhase) * wind.gustDepth;
-  const softFlutter = Math.sin(swingTime * 1.31 + wind.gustPhase * 0.7) * wind.gustDepth * 0.28;
-  wind.currentSpeed = Math.max(0.35, wind.baseSpeed * (1 + slowGust + softFlutter));
+  const altitude = heightWindMultiplier();
+  const altitudeGust = 1 + Math.min(floors, 40) * 0.006;
+  const slowGust = Math.sin(swingTime * 0.52 + wind.gustPhase) * wind.gustDepth * altitudeGust;
+  const softFlutter = Math.sin(swingTime * 1.31 + wind.gustPhase * 0.7) * wind.gustDepth * 0.28 * altitudeGust;
+  wind.currentSpeed = Math.max(0.35, wind.baseSpeed * altitude * (1 + slowGust + softFlutter));
   if (mode === 'start' && falling) swingSpeed = 0.75;
   updateLoad(dt);
   updateImpacts(dt);
