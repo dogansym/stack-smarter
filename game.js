@@ -26,6 +26,7 @@ const MILESTONES = [
 ];
 const AWARD_TYPES = new Set(MILESTONES.map(({ type }) => type));
 const UP = new THREE.Vector3(0, 1, 0);
+const cableStart = new THREE.Vector3(), cableEnd = new THREE.Vector3(), cableDelta = new THREE.Vector3();
 const clock = new THREE.Clock();
 
 let mode = 'start', score = 0, floors = 0, combo = 0, instability = 0;
@@ -35,9 +36,10 @@ let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
 let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
 let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0;
 const windTurbines = [];
+let siteContainer = null;
 let highestAward = null;
 let wind = {
-  baseSpeed: 3.2, currentSpeed: 3.2, fromAngle: Math.PI * 1.75,
+  baseSpeed: 2.7, currentSpeed: 2.7, fromAngle: Math.PI * 1.75,
   vector: new THREE.Vector3(0.7, 0, 0.7), label: 'NW', calm: false, gustDepth: 0.16, gustPhase: 0
 };
 
@@ -95,7 +97,7 @@ function createMaterials() {
     darkGlass: new THREE.MeshStandardMaterial({ color: 0x314144, roughness: 0.2, metalness: 0.2 }),
     ground: new THREE.MeshStandardMaterial({ color: C.soil, roughness: 0.98 }),
     fence: new THREE.MeshStandardMaterial({ color: 0xcac7bf, roughness: 0.78, metalness: 0.18 }),
-    cable: new THREE.LineBasicMaterial({ color: C.ink, transparent: true, opacity: 0.82 })
+    cable3D: new THREE.MeshStandardMaterial({ color: 0x252928, roughness: 0.32, metalness: 0.82 })
   };
 }
 
@@ -150,7 +152,7 @@ function buildSite() {
   world.add(grid);
   createFence(0, -5.8, 19, 0);
   createFence(8.8, 1.35, 5.2, Math.PI / 2);
-  createContainer(5.85, 0, -4.18);
+  siteContainer = createContainer(5.85, 0, -4.18);
   createPallet(-3.8, 0, -4.5);
   createWindTurbine(-13.5, -17.5, 1.08);
   createWindTurbine(13.5, -22, 0.72);
@@ -220,6 +222,7 @@ function createContainer(x, y, z) {
   group.position.set(x, y, z);
   group.rotation.y = -0.08;
   world.add(group);
+  return group;
 }
 
 function createPallet(x, y, z) {
@@ -282,6 +285,17 @@ function buildCrane() {
   const upper = box(jibEnd - jibStart - 0.8, 0.08, 0.08, materials.steelDark);
   upper.position.set((jibEnd + jibStart) / 2, 0.72, 0);
   head.add(upper);
+  const slewRing = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.22, 24), materials.steelDark);
+  slewRing.position.set(-7.2, -0.18, 0);
+  head.add(slewRing);
+  const turntable = box(1.7, 0.22, 1.22, materials.glacierDark);
+  turntable.position.set(-7.2, 0.02, 0);
+  head.add(turntable);
+  const apex = box(0.16, 2.05, 0.16, materials.steelDark);
+  apex.position.set(-7.2, 1.4, 0);
+  head.add(apex);
+  head.add(brace(new THREE.Vector3(-7.2, 2.4, 0), new THREE.Vector3(4.9, 0.7, 0), 0.035, materials.steelDark));
+  head.add(brace(new THREE.Vector3(-7.2, 2.4, 0), new THREE.Vector3(-9.35, 0.2, 0), 0.045, materials.steelDark));
   const cabin = box(1.2, 0.82, 1.05, materials.glacier);
   cabin.position.set(-6.3, -0.47, 0);
   head.add(cabin);
@@ -296,20 +310,49 @@ function buildCrane() {
   head.add(counter);
   crane.add(head);
   const trolley = new THREE.Group();
-  trolley.add(box(0.72, 0.25, 0.78, materials.glacier));
-  trolley.position.y = -0.27;
+  const trolleyFrame = box(0.94, 0.2, 0.9, materials.glacierDark);
+  trolleyFrame.position.y = -0.08;
+  trolley.add(trolleyFrame);
+  const hoistMotor = box(0.48, 0.34, 0.5, materials.steelDark);
+  hoistMotor.position.y = -0.3;
+  trolley.add(hoistMotor);
+  const motorCap = box(0.5, 0.055, 0.52, materials.glacier);
+  motorCap.position.y = -0.495;
+  trolley.add(motorCap);
+  for (const x of [-0.32, 0.32]) for (const z of [-0.39, 0.39]) {
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 12), materials.steelDark);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(x, 0.02, z);
+    trolley.add(wheel);
+  }
+  trolley.position.y = -0.22;
   head.add(trolley);
+
   const hook = new THREE.Group();
-  hook.add(box(0.36, 0.32, 0.28, materials.steelDark));
-  const hookMesh = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.055, 8, 18, Math.PI * 1.55), materials.steelDark);
-  hookMesh.rotation.z = 0.2;
-  hookMesh.position.y = -0.27;
+  const hookBlock = bevelBox(0.5, 0.38, 0.34, 0.045, materials.steelDark);
+  hook.add(hookBlock);
+  for (const z of [-0.2, 0.2]) {
+    const pulley = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.055, 18), materials.glacierDark);
+    pulley.rotation.x = Math.PI / 2;
+    pulley.position.set(0, 0.02, z);
+    hook.add(pulley);
+  }
+  const spreader = box(0.92, 0.08, 0.18, materials.steelDark);
+  spreader.position.y = -0.25;
+  hook.add(spreader);
+  const hookMesh = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.065, 10, 22, Math.PI * 1.55), materials.steelDark);
+  hookMesh.rotation.z = 0.16;
+  hookMesh.position.y = -0.48;
   hook.add(hookMesh);
   crane.add(hook);
-  const cableGeometry = new THREE.BufferGeometry();
-  cableGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(12), 3));
-  const cables = new THREE.LineSegments(cableGeometry, materials.cable);
-  cables.frustumCulled = false;
+
+  const cables = new THREE.Group();
+  const cableGeometry = new THREE.CylinderGeometry(0.018, 0.018, 1, 8);
+  for (let i = 0; i < 6; i++) {
+    const cable = new THREE.Mesh(cableGeometry, materials.cable3D);
+    cable.castShadow = true;
+    cables.add(cable);
+  }
   crane.add(cables);
   return { head, trolley, hook, cables };
 }
@@ -387,7 +430,7 @@ function setWind(preview = false) {
   ];
   const selected = preview ? directions[7] : directions[Math.floor(Math.random() * directions.length)];
   const calm = !preview && Math.random() < 0.08;
-  const baseSpeed = preview ? 3.2 : calm ? 0.6 + Math.random() * 0.4 : 2.5 + Math.random() * 3.8;
+  const baseSpeed = preview ? 2.7 : calm ? 0.7 + Math.random() * 0.45 : 2.1 + Math.random() * 1.1;
   const fromAngle = selected[1];
   wind = {
     label: selected[0], fromAngle, baseSpeed, currentSpeed: baseSpeed, calm,
@@ -694,18 +737,39 @@ function updateLoad(dt) {
 
 function updateLoadTransform() { if (falling) falling.object.position.set(falling.x, falling.y, falling.z); }
 
+function setCableSegment(mesh, ax, ay, az, bx, by, bz) {
+  cableStart.set(ax, ay, az);
+  cableEnd.set(bx, by, bz);
+  cableDelta.subVectors(cableEnd, cableStart);
+  mesh.position.copy(cableStart).add(cableEnd).multiplyScalar(0.5);
+  mesh.scale.set(1, cableDelta.length(), 1);
+  mesh.quaternion.setFromUnitVectors(UP, cableDelta.normalize());
+}
+
 function updateCables(load) {
   craneParts.hook.visible = Boolean(load);
-  craneParts.cables.visible = Boolean(load && load.state === 'swing');
+  craneParts.cables.visible = Boolean(load);
   if (!load) return;
-  const anchorY = craneY - 0.38, hookY = load.y + load.h / 2 + 0.48;
-  craneParts.hook.position.set(load.x, hookY, load.z);
-  if (load.state !== 'swing') return;
-  const pos = craneParts.cables.geometry.attributes.position.array;
-  const trolleyX = craneParts.trolley.position.x, spread = Math.min(0.7, load.w * 0.18);
-  const points = [trolleyX - 0.18, anchorY, -0.18, load.x - spread, hookY, load.z - 0.12, trolleyX + 0.18, anchorY, 0.18, load.x + spread, hookY, load.z + 0.12];
-  for (let i = 0; i < 12; i++) pos[i] = points[i];
-  craneParts.cables.geometry.attributes.position.needsUpdate = true;
+  const trolleyX = craneParts.trolley.position.x;
+  const anchorY = craneY - 0.47;
+  if (load.state === 'swing') {
+    const hookY = load.y + load.h / 2 + 0.72;
+    craneParts.hook.position.set(load.x, hookY, load.z);
+  }
+  const { x: hookX, y: hookY, z: hookZ } = craneParts.hook.position;
+  const wires = craneParts.cables.children;
+  setCableSegment(wires[0], trolleyX - 0.14, anchorY, -0.16, hookX - 0.11, hookY + 0.17, hookZ - 0.1);
+  setCableSegment(wires[1], trolleyX + 0.14, anchorY, 0.16, hookX + 0.11, hookY + 0.17, hookZ + 0.1);
+  const rigged = load.state === 'swing';
+  for (let i = 2; i < wires.length; i++) wires[i].visible = rigged;
+  if (!rigged) return;
+  const loadTop = load.y + load.h / 2 + 0.07;
+  const spreadX = Math.min(1.45, load.w * 0.31);
+  const spreadZ = Math.min(0.72, load.d * 0.27);
+  setCableSegment(wires[2], hookX - 0.42, hookY - 0.22, hookZ - 0.07, load.x - spreadX, loadTop, load.z - spreadZ);
+  setCableSegment(wires[3], hookX + 0.42, hookY - 0.22, hookZ - 0.07, load.x + spreadX, loadTop, load.z - spreadZ);
+  setCableSegment(wires[4], hookX - 0.42, hookY - 0.22, hookZ + 0.07, load.x - spreadX, loadTop, load.z + spreadZ);
+  setCableSegment(wires[5], hookX + 0.42, hookY - 0.22, hookZ + 0.07, load.x + spreadX, loadTop, load.z + spreadZ);
 }
 
 function updateImpacts(dt) {
@@ -971,6 +1035,10 @@ function animate() {
 
 function resize() {
   const w = innerWidth, h = innerHeight;
+  if (siteContainer) {
+    siteContainer.position.x = w < 700 ? 1 : 5.85;
+    siteContainer.position.z = w < 700 ? -4.35 : -4.18;
+  }
   camera.aspect = w / h;
   camera.fov = w < 700 ? THREE.MathUtils.clamp(44 + (700 - w) * 0.018, 44, 50) : 37;
   camera.updateProjectionMatrix();
