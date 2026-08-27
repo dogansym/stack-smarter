@@ -7,7 +7,7 @@
   <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
   <title>Stack Smarter | Symetri</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20260827-12">
+  <link rel="stylesheet" href="styles.css?v=20260827-13">
 </head>
 <body>
   <main id="app" aria-label="Stack Smarter game">
@@ -23,6 +23,10 @@
         </button>
         <button id="restartButton" class="icon-button" type="button" aria-label="Start over" title="Start over" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M19 12a7 7 0 1 0-1.2 5.1"/></svg>
+        </button>
+        <button id="soundButton" class="icon-button" type="button" aria-label="Turn sound off" aria-pressed="true">
+          <svg class="sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.3-1.3a6 6 0 0 1 0 8.6M18.8 5.2a9.5 9.5 0 0 1 0 13.6"/></svg>
+          <svg class="sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5.5 5 5m0-5-5 5"/></svg>
         </button>
       </div>
     </header>
@@ -98,6 +102,6 @@
 
     <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
   </main>
-  <script type="module" src="game.js?v=20260827-12"></script>
+  <script type="module" src="game.js?v=20260827-13"></script>
 </body>
 </html>
