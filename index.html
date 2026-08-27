@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#f1efe9">
+  <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
+  <title>Stack Smarter | Symetri</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app" aria-label="Stack Smarter game">
+    <canvas id="game" aria-label="Construction stacking game"></canvas>
+
+    <header class="topbar">
+      <img class="brand" src="images/Symetri-logo-RGB-black.png" alt="Symetri — part of Addnode Group">
+      <button id="soundButton" class="icon-button" type="button" aria-label="Turn sound off" aria-pressed="true">
+        <svg class="sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.3-1.3a6 6 0 0 1 0 8.6M18.8 5.2a9.5 9.5 0 0 1 0 13.6"/></svg>
+        <svg class="sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5.5 5 5m0-5-5 5"/></svg>
+      </button>
+    </header>
+
+    <section id="hud" class="hud" aria-live="polite">
+      <div><span>FLOORS</span><strong id="floors">0</strong></div>
+      <div class="multiplier"><span>MULTIPLIER</span><strong id="multiplier">×1</strong></div>
+      <div class="score"><span>SCORE</span><strong id="score">0000</strong></div>
+    </section>
+
+    <div id="feedback" class="feedback" aria-live="assertive"></div>
+
+    <section id="startScreen" class="screen start-screen">
+      <div class="hero-mark" aria-hidden="true">
+        <img src="images/visual_element_rgb_stroke glacier1.png" alt="">
+      </div>
+      <div class="panel start-panel">
+        <p class="eyebrow">SYMETRI × BIM WORLD COPENHAGEN</p>
+        <h1>STACK<br><span>SMARTER</span></h1>
+        <p class="lede">Build higher. Place smarter.<br>How far can you take it?</p>
+        <button id="playButton" class="primary-button" type="button"><span>PLAY</span><i aria-hidden="true">→</i></button>
+        <p class="tap-hint">TAP ANYWHERE TO DROP</p>
+      </div>
+      <img class="work-smarter" src="images/work_smarter_1row_black.png" alt="Work smarter">
+    </section>
+
+    <section id="gameOverScreen" class="screen gameover-screen" hidden>
+      <div class="panel gameover-panel">
+        <p class="eyebrow">STRUCTURAL REPORT</p>
+        <h2>COLLAPSE</h2>
+        <div class="results">
+          <div><span>SCORE</span><strong id="finalScore">0</strong></div>
+          <div><span>FLOORS</span><strong id="finalFloors">0</strong></div>
+        </div>
+        <p id="bestLine" class="best-line">BEST 0 · 0 FLOORS</p>
+        <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
+      </div>
+    </section>
+
+    <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
+  </main>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
