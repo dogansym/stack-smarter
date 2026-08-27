@@ -6,9 +6,10 @@ const ui = {
   start: $('#startScreen'), over: $('#gameOverScreen'), hud: $('#hud'),
   floors: $('#floors'), score: $('#score'), multiplier: $('#multiplier'),
   finalScore: $('#finalScore'), finalFloors: $('#finalFloors'), best: $('#bestLine'),
-  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'),
+  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'), home: $('#homeButton'),
   siteReadout: $('#siteReadout'), windArrow: $('#windArrow'), windValue: $('#windValue'),
-  gustMeter: $('#gustMeter'), prizeProgress: $('#prizeProgress'), prizeResult: $('#prizeResult')
+  windSpeed: $('#windSpeed'), windState: $('#windState'), gustMeter: $('#gustMeter'),
+  prizeProgress: $('#prizeProgress'), prizeResult: $('#prizeResult')
 };
 
 const C = {
@@ -21,11 +22,13 @@ const UP = new THREE.Vector3(0, 1, 0);
 const clock = new THREE.Clock();
 
 let mode = 'start', score = 0, floors = 0, combo = 0, multiplier = 1, instability = 0;
+let smartAssists = 2;
 let towerTop = 0.42, swingTime = 0, swingSpeed = 1.18, falling = null;
 let blocks = [], bodies = [], particles = [];
 let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
 let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
-let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0, windSock = null;
+let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0;
+const windTurbines = [];
 let prizeUnlocked = false;
 let wind = {
   baseSpeed: 3.2, currentSpeed: 3.2, fromAngle: Math.PI * 1.75,
@@ -139,32 +142,41 @@ function buildSite() {
   createFence(8.8, 1.35, 5.2, Math.PI / 2);
   createContainer(5.85, 0, -4.18);
   createPallet(-3.8, 0, -4.5);
-  createWindSock(1.8, -4.6);
+  createWindTurbine(-13.5, -17.5, 1.08);
+  createWindTurbine(13.5, -22, 0.72);
   createCitySilhouette();
   const workSign = imagePlane(workTexture, 1.68, 0.247, false);
   workSign.position.set(-3, 0.82, -5.758);
   world.add(workSign);
 }
 
-function createWindSock(x, z) {
+function createWindTurbine(x, z, scale) {
   const group = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 3.1, 10), materials.steelDark);
-  pole.position.y = 1.55;
-  pole.castShadow = true;
-  group.add(pole);
-  const arm = box(0.6, 0.045, 0.045, materials.steelDark);
-  arm.position.set(0.26, 3.04, 0);
-  group.add(arm);
-  windSock = new THREE.Group();
-  const sock = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.15, 14, 1, true), materials.glacier);
-  sock.rotation.z = -Math.PI / 2;
-  sock.position.x = 0.6;
-  sock.castShadow = true;
-  windSock.add(sock);
-  windSock.position.set(0.55, 3.02, 0);
-  group.add(windSock);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.34, 8.4, 18), materials.white);
+  tower.position.y = 4.2;
+  tower.castShadow = true;
+  group.add(tower);
+  const nacelle = box(0.78, 0.42, 1.15, materials.white);
+  nacelle.position.set(0, 8.48, 0.12);
+  group.add(nacelle);
+  const rotor = new THREE.Group();
+  rotor.position.set(0, 8.47, 0.73);
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 12), materials.glacier);
+  hub.castShadow = true;
+  rotor.add(hub);
+  const bladeGeometry = new THREE.BoxGeometry(0.16, 2.55, 0.075);
+  bladeGeometry.translate(0, 1.25, 0);
+  for (let i = 0; i < 3; i++) {
+    const blade = new THREE.Mesh(bladeGeometry, materials.white);
+    blade.rotation.z = i * Math.PI * 2 / 3;
+    blade.castShadow = true;
+    rotor.add(blade);
+  }
+  group.add(rotor);
   group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
   world.add(group);
+  windTurbines.push({ rotor, offset: Math.random() * Math.PI * 2 });
 }
 
 function createFence(x, z, length, rotation) {
@@ -376,7 +388,10 @@ function setWind(preview = false) {
 }
 
 function updateWeatherUI() {
-  ui.windValue.textContent = `FROM ${wind.label} · ${wind.baseSpeed.toFixed(1)} M/S`;
+  const degrees = Math.round(THREE.MathUtils.radToDeg(wind.fromAngle)) % 360;
+  ui.windValue.textContent = `FROM ${wind.label} · ${degrees}°`;
+  ui.windSpeed.textContent = wind.baseSpeed.toFixed(1);
+  ui.windState.textContent = `${wind.calm ? 'LIGHT AIR' : 'STEADY FLOW'} · DRY 16°C`;
   ui.windArrow.style.transform = `rotate(${wind.fromAngle + Math.PI}rad)`;
   const activeBars = Math.max(1, Math.ceil(wind.baseSpeed / 1.3));
   [...ui.gustMeter.children].forEach((bar, index) => bar.classList.toggle('active', index < activeBars));
@@ -495,16 +510,29 @@ function releaseLoad() {
 
 function landLoad() {
   const support = blocks[blocks.length - 1], f = falling;
-  const overlapX = Math.max(0, Math.min(f.x + f.w / 2, support.x + support.w / 2) - Math.max(f.x - f.w / 2, support.x - support.w / 2));
-  const overlapZ = Math.max(0, Math.min(f.z + f.d / 2, support.z + support.d / 2) - Math.max(f.z - f.d / 2, support.z - support.d / 2));
-  const ratioX = overlapX / Math.min(f.w, support.w), ratioZ = overlapZ / Math.min(f.d, support.d), supportRatio = ratioX * ratioZ;
-  if (supportRatio < 0.2) { beginCollapse(f); return; }
+  const guideStrength = Math.max(0.08, 0.24 - floors * 0.006);
+  if (Math.abs(f.x - support.x) < support.w * 0.22) f.x = THREE.MathUtils.lerp(f.x, support.x, guideStrength);
+  if (Math.abs(f.z - support.z) < support.d * 0.22) f.z = THREE.MathUtils.lerp(f.z, support.z, guideStrength);
+  const measureSupport = () => {
+    const overlapX = Math.max(0, Math.min(f.x + f.w / 2, support.x + support.w / 2) - Math.max(f.x - f.w / 2, support.x - support.w / 2));
+    const overlapZ = Math.max(0, Math.min(f.z + f.d / 2, support.z + support.d / 2) - Math.max(f.z - f.d / 2, support.z - support.d / 2));
+    const ratioX = overlapX / Math.min(f.w, support.w), ratioZ = overlapZ / Math.min(f.d, support.d);
+    return ratioX * ratioZ;
+  };
+  let supportRatio = measureSupport(), assisted = false;
+  if (supportRatio >= 0.11 && supportRatio < 0.2 && smartAssists > 0) {
+    f.x = THREE.MathUtils.lerp(f.x, support.x, 0.55);
+    f.z = THREE.MathUtils.lerp(f.z, support.z, 0.55);
+    supportRatio = measureSupport();
+    if (supportRatio >= 0.16) { assisted = true; smartAssists--; }
+  }
+  if (supportRatio < 0.16) { beginCollapse(f); return; }
   const dx = f.x - support.x, dz = f.z - support.z;
   const normalizedOffset = Math.sqrt((dx / (support.w * 0.5)) ** 2 + (dz / (support.d * 0.5)) ** 2);
   const tilt = Math.min(0.18, (Math.abs(f.object.rotation.x) + Math.abs(f.object.rotation.z)) * 0.25);
   const accuracy = THREE.MathUtils.clamp(1 - normalizedOffset - tilt, 0, 1);
-  const perfect = accuracy > 0.91 && supportRatio > 0.88;
-  const nearPerfect = !perfect && accuracy > 0.77 && supportRatio > 0.7;
+  const perfect = accuracy > 0.89 && supportRatio > 0.86;
+  const nearPerfect = !perfect && accuracy > 0.74 && supportRatio > 0.66;
   f.state = 'placed';
   f.y = towerTop + f.h / 2;
   f.object.position.set(f.x, f.y, f.z);
@@ -530,7 +558,7 @@ function landLoad() {
     combo = 0;
     multiplier = 1;
     score += Math.round(102 + accuracy * 48 + floors * 3);
-    instability += Math.max(0.015, (1 - supportRatio) * 0.12);
+    instability = Math.max(0, instability + (1 - supportRatio) * 0.07 - 0.025);
     showFeedback(`ALMOST PERFECT · ${Math.round(accuracy * 100)}%`, 'near');
     spawnParticles(f.x, towerTop + 0.03, f.z, C.glacier, 17, 1.05);
     spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 1);
@@ -539,11 +567,16 @@ function landLoad() {
     combo = 0;
     multiplier = 1;
     score += Math.round(38 + accuracy * 68 + floors * 3);
-    const overhangRisk = Math.pow(1 - supportRatio, 1.2) * 0.54;
-    instability += overhangRisk + normalizedOffset * 0.17 + tilt * 0.8;
+    const overhangRisk = Math.pow(1 - supportRatio, 1.25) * 0.31;
+    instability += overhangRisk + normalizedOffset * 0.095 + tilt * 0.46;
     showFeedback(accuracy > 0.68 ? 'SOLID PLACEMENT' : elementLabel(f.type), false);
     spawnParticles(f.x, towerTop, f.z, 0xb3aea4, 13, 0.72);
     playImpact(accuracy);
+  }
+  if (assisted) {
+    showFeedback(`SMART ALIGN · ${smartAssists} LEFT`, 'near');
+    spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 0.9);
+    playNearPerfect(0.76);
   }
   if (f.type === 'prize') {
     prizeUnlocked = true;
@@ -557,11 +590,11 @@ function landLoad() {
   }
   shake = nearPerfect || perfect ? 0.15 : 0.065 + (1 - accuracy) * 0.12;
   impactFlash = 1;
-  swingSpeed = Math.min(2.75, 1.18 + floors * 0.072);
-  cameraTargetY = Math.max(3.4, towerTop + 1.6);
+  swingSpeed = Math.min(2.4, 1.18 + floors * 0.052);
+  cameraTargetY = Math.max(3.4, towerTop * 0.62 + 2.2);
   updateUI();
   falling = null;
-  if (instability > 1.03 && floors > 3) setTimeout(() => mode === 'playing' && beginCollapse(), 260);
+  if (instability > 1.45 && floors > 5) setTimeout(() => mode === 'playing' && beginCollapse(), 260);
   else setTimeout(() => mode === 'playing' && spawnLoad(), 230);
 }
 
@@ -740,7 +773,12 @@ function spawnImpactRing(x, y, z, color, growth) {
 function updateCamera(dt) {
   cameraFocusY = THREE.MathUtils.damp(cameraFocusY, cameraTargetY, 3.4, dt);
   const mobile = innerWidth < 700;
-  const desired = new THREE.Vector3(mobile ? 10.8 : 11.8, cameraFocusY + (mobile ? 7.2 : 6.4), mobile ? 17.4 : 15.4);
+  const pullback = THREE.MathUtils.clamp((towerTop - 4) * 0.42, 0, 9);
+  const desired = new THREE.Vector3(
+    (mobile ? 10.8 : 11.8) + pullback * 0.52,
+    cameraFocusY + (mobile ? 7.2 : 6.4) + pullback * 0.22,
+    (mobile ? 17.4 : 15.4) + pullback
+  );
   camera.position.lerp(desired, 1 - Math.exp(-dt * 3.2));
   if (shake > 0.002) {
     camera.position.x += (Math.random() - 0.5) * shake;
@@ -758,6 +796,7 @@ function startGame() {
   score = floors = combo = 0;
   multiplier = 1;
   instability = 0;
+  smartAssists = 2;
   prizeUnlocked = false;
   swingTime = 0;
   swingSpeed = 1.18;
@@ -766,10 +805,23 @@ function startGame() {
   ui.over.hidden = true;
   ui.prizeResult.hidden = true;
   ui.siteReadout.hidden = false;
+  ui.home.hidden = false;
   setWind(false);
   ui.hud.classList.add('visible');
   resetStructure();
   updateUI();
+}
+
+function returnHome() {
+  mode = 'start';
+  ui.start.hidden = false;
+  ui.over.hidden = true;
+  ui.hud.classList.remove('visible');
+  ui.siteReadout.hidden = true;
+  ui.home.hidden = true;
+  setWind(true);
+  swingSpeed = 0.75;
+  resetStructure(true);
 }
 
 function showGameOver() {
@@ -828,10 +880,9 @@ function animate() {
   updatePhysics(dt);
   updateParticles(dt);
   updateCamera(dt);
-  if (windSock) {
-    windSock.rotation.y = THREE.MathUtils.damp(windSock.rotation.y, Math.atan2(-wind.vector.z, wind.vector.x), 4, dt);
-    windSock.rotation.z = Math.sin(swingTime * (4 + wind.currentSpeed * 0.4)) * (0.018 + wind.currentSpeed * 0.004);
-  }
+  windTurbines.forEach(turbine => {
+    turbine.rotor.rotation.z = turbine.offset - swingTime * (0.28 + wind.currentSpeed * 0.17);
+  });
   impactFlash = Math.max(0, impactFlash - dt * 5);
   renderer.toneMappingExposure = 1.04 + impactFlash * 0.045;
   renderer.render(scene, camera);
@@ -997,6 +1048,7 @@ function updateSoundButton() {
 
 ui.play.addEventListener('click', startGame);
 ui.replay.addEventListener('click', startGame);
+ui.home.addEventListener('click', returnHome);
 ui.sound.addEventListener('click', event => {
   event.stopPropagation();
   soundOn = !soundOn;
