@@ -7,18 +7,24 @@ const ui = {
   floors: $('#floors'), score: $('#score'), finalScore: $('#finalScore'), finalFloors: $('#finalFloors'), best: $('#bestLine'),
   resultKicker: $('#resultKicker'), resultLevel: $('#resultLevel'), gameOverTitle: $('#gameOverTitle'),
   resultMessage: $('#resultMessage'), celebration: $('#resultCelebration'),
-  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'), home: $('#homeButton'),
+  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'), home: $('#homeButton'), restart: $('#restartButton'),
   siteReadout: $('#siteReadout'), windArrow: $('#windArrow'), windValue: $('#windValue'),
   windSpeed: $('#windSpeed'), windState: $('#windState'), gustMeter: $('#gustMeter'),
-  prizeProgress: $('#prizeProgress'), prizeResult: $('#prizeResult')
+  prizeProgress: $('#prizeProgress'), prizeReadout: document.querySelector('.prize-readout'), prizeResult: $('#prizeResult'),
+  prizeResultTitle: $('#prizeResultTitle'), prizeResultText: $('#prizeResultText')
 };
 
 const C = {
   paper: 0xf1efe9, glacier: 0x43aec4, pale: 0xc9eaf0, ink: 0x171918,
   concrete: 0xb8b6af, concreteTop: 0xd1cfc8, steel: 0x444a4a, glass: 0x84bcc5,
-  white: 0xe9e8e3, soil: 0xd7d3ca, gold: 0xc7a354
+  white: 0xe9e8e3, soil: 0xd7d3ca, bronze: 0xb2763f, silver: 0xaeb7bd, gold: 0xc7a354
 };
-const PRIZE_FLOOR = 15;
+const MILESTONES = [
+  { floor: 15, type: 'bronze', label: 'BRONZE', color: C.bronze, bonus: 600 },
+  { floor: 20, type: 'silver', label: 'SILVER', color: C.silver, bonus: 1000 },
+  { floor: 30, type: 'gold', label: 'GOLD', color: C.gold, bonus: 1800 }
+];
+const AWARD_TYPES = new Set(MILESTONES.map(({ type }) => type));
 const UP = new THREE.Vector3(0, 1, 0);
 const clock = new THREE.Clock();
 
@@ -29,7 +35,7 @@ let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
 let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
 let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0;
 const windTurbines = [];
-let prizeUnlocked = false;
+let highestAward = null;
 let wind = {
   baseSpeed: 3.2, currentSpeed: 3.2, fromAngle: Math.PI * 1.75,
   vector: new THREE.Vector3(0.7, 0, 0.7), label: 'NW', calm: false, gustDepth: 0.16, gustPhase: 0
@@ -77,6 +83,10 @@ function createMaterials() {
     white: new THREE.MeshStandardMaterial({ color: C.white, roughness: 0.66 }),
     glacier: new THREE.MeshStandardMaterial({ color: C.glacier, roughness: 0.48, metalness: 0.08 }),
     glacierDark: new THREE.MeshStandardMaterial({ color: 0x278da1, roughness: 0.5 }),
+    bronze: new THREE.MeshStandardMaterial({ color: C.bronze, roughness: 0.34, metalness: 0.62 }),
+    bronzeDark: new THREE.MeshStandardMaterial({ color: 0x704625, roughness: 0.42, metalness: 0.52 }),
+    silver: new THREE.MeshStandardMaterial({ color: C.silver, roughness: 0.27, metalness: 0.78 }),
+    silverDark: new THREE.MeshStandardMaterial({ color: 0x66747a, roughness: 0.36, metalness: 0.66 }),
     gold: new THREE.MeshStandardMaterial({ color: C.gold, roughness: 0.3, metalness: 0.72 }),
     goldDark: new THREE.MeshStandardMaterial({ color: 0x8d6b25, roughness: 0.38, metalness: 0.62 }),
     steel: new THREE.MeshStandardMaterial({ color: C.steel, roughness: 0.38, metalness: 0.72, map: steelMap }),
@@ -354,7 +364,8 @@ function spawnLoad(preview = false) {
 }
 
 function chooseType() {
-  if (floors + 1 === PRIZE_FLOOR) return 'prize';
+  const milestone = MILESTONES.find(({ floor }) => floor === floors + 1);
+  if (milestone) return milestone.type;
   if ((floors + 1) % 8 === 0) return 'smart';
   return ['slab', 'module', 'beam', 'facade'][floors % 4];
 }
@@ -365,7 +376,7 @@ function dimensionsFor(type) {
   if (type === 'beam') return { w: 5.3 * jitter, h: 0.62, d: 2.15 };
   if (type === 'facade') return { w: 4.95 * jitter, h: 1.05, d: 2.72 };
   if (type === 'smart') return { w: 5.05, h: 1.05, d: 2.9 };
-  if (type === 'prize') return { w: 5.15, h: 1.18, d: 2.92 };
+  if (AWARD_TYPES.has(type)) return { w: 5.15, h: 1.18, d: 2.92 };
   return { w: 5.18 * jitter, h: 0.52, d: 3.02 };
 }
 
@@ -454,20 +465,23 @@ function createElement(type, dims) {
         group.add(mullion);
       }
     }
-  } else if (type === 'prize') {
-    group.add(bevelBox(dims.w, dims.h, dims.d, 0.055, materials.gold));
+  } else if (AWARD_TYPES.has(type)) {
+    const milestone = MILESTONES.find(({ type: awardType }) => awardType === type);
+    const awardMaterial = materials[type];
+    const awardDarkMaterial = materials[`${type}Dark`];
+    group.add(bevelBox(dims.w, dims.h, dims.d, 0.055, awardMaterial));
     for (let x = -dims.w / 2 + 0.14; x <= dims.w / 2 - 0.14; x += dims.w / 10) {
-      const rib = box(0.035, dims.h * 0.82, dims.d + 0.04, materials.goldDark);
+      const rib = box(0.035, dims.h * 0.82, dims.d + 0.04, awardDarkMaterial);
       rib.position.set(x, 0, 0);
       group.add(rib);
     }
-    const darkBand = box(dims.w * 0.92, dims.h * 0.45, dims.d + 0.065, materials.goldDark);
+    const darkBand = box(dims.w * 0.92, dims.h * 0.45, dims.d + 0.065, awardDarkMaterial);
     darkBand.position.y = -0.02;
     group.add(darkBand);
     const logo = imagePlane(logoTexture, 1.68, 0.648, false);
     logo.position.set(-dims.w * 0.2, 0, dims.d / 2 + 0.055);
     group.add(logo);
-    const prizeText = textPlane('GOLD LIFT · LEVEL 15', 2.05, 0.38, '#ffffff');
+    const prizeText = textPlane(`${milestone.label} LIFT · LEVEL ${milestone.floor}`, 2.05, 0.38, '#ffffff');
     prizeText.position.set(dims.w * 0.22, 0, dims.d / 2 + 0.06);
     group.add(prizeText);
   } else {
@@ -560,14 +574,16 @@ function landLoad() {
     spawnParticles(f.x, towerTop, f.z, 0xb3aea4, 13, 0.72);
     playImpact(accuracy);
   }
-  if (f.type === 'prize') {
-    prizeUnlocked = true;
-    const wins = Number(localStorage.getItem('stack-smarter-prize-wins') || 0) + 1;
-    localStorage.setItem('stack-smarter-prize-wins', String(wins));
-    score += 1200;
-    showFeedback('PRIZE UNLOCKED', 'prize');
-    spawnParticles(f.x, towerTop + 0.2, f.z, C.gold, 42, 2.3);
-    spawnImpactRing(f.x, towerTop + 0.04, f.z, C.gold, 1.8);
+  const milestone = MILESTONES.find(({ type }) => type === f.type);
+  if (milestone) {
+    highestAward = milestone.type;
+    const storageKey = `stack-smarter-${milestone.type}-wins`;
+    const wins = Number(localStorage.getItem(storageKey) || 0) + 1;
+    localStorage.setItem(storageKey, String(wins));
+    score += milestone.bonus;
+    showFeedback(`${milestone.label} UNLOCKED`, milestone.type);
+    spawnParticles(f.x, towerTop + 0.2, f.z, milestone.color, 42, 2.3);
+    spawnImpactRing(f.x, towerTop + 0.04, f.z, milestone.color, 1.8);
     playPrize();
   }
   shake = nearPerfect || perfect ? 0.15 : 0.065 + (1 - accuracy) * 0.12;
@@ -752,13 +768,18 @@ function spawnImpactRing(x, y, z, color, growth) {
 }
 
 function updateCamera(dt) {
-  cameraFocusY = THREE.MathUtils.damp(cameraFocusY, cameraTargetY, 3.4, dt);
   const mobile = innerWidth < 700;
+  if (mode === 'playing') {
+    const workZone = towerTop + (falling?.state === 'swing' ? 3.15 : 2.75);
+    cameraTargetY = Math.max(3.4, workZone);
+  }
+  cameraFocusY = THREE.MathUtils.damp(cameraFocusY, cameraTargetY, mobile ? 5.2 : 3.4, dt);
   const pullback = THREE.MathUtils.clamp((towerTop - 4) * 0.68, 0, 14);
+  const framingPullback = mobile ? pullback * 1.08 : pullback;
   const desired = new THREE.Vector3(
-    (mobile ? 10.8 : 11.8) + pullback * 0.46,
-    cameraFocusY + (mobile ? 7.2 : 6.4) + pullback * 0.16,
-    (mobile ? 17.4 : 15.4) + pullback
+    (mobile ? 10.8 : 11.8) + framingPullback * 0.46,
+    cameraFocusY + (mobile ? 7.2 : 6.4) + framingPullback * 0.16,
+    (mobile ? 17.4 : 15.4) + framingPullback
   );
   camera.position.lerp(desired, 1 - Math.exp(-dt * 3.2));
   if (shake > 0.002) {
@@ -776,7 +797,7 @@ function startGame() {
   mode = 'playing';
   score = floors = combo = 0;
   instability = 0;
-  prizeUnlocked = false;
+  highestAward = null;
   swingTime = 0;
   swingSpeed = 1.18;
   loadSerial = 0;
@@ -785,8 +806,10 @@ function startGame() {
   ui.over.classList.remove('celebrate');
   ui.celebration.replaceChildren();
   ui.prizeResult.hidden = true;
+  ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
   ui.siteReadout.hidden = false;
   ui.home.hidden = false;
+  ui.restart.hidden = false;
   setWind(false);
   ui.hud.classList.add('visible');
   resetStructure();
@@ -802,6 +825,7 @@ function returnHome() {
   ui.hud.classList.remove('visible');
   ui.siteReadout.hidden = true;
   ui.home.hidden = true;
+  ui.restart.hidden = true;
   setWind(true);
   swingSpeed = 0.75;
   resetStructure(true);
@@ -821,21 +845,25 @@ function showGameOver() {
   ui.finalScore.textContent = score.toLocaleString();
   ui.finalFloors.textContent = floors;
   ui.best.textContent = isNewBest ? `NEW BEST · ${bestScore.toLocaleString()} · ${bestFloors} FLOORS` : `BEST ${bestScore.toLocaleString()} · ${bestFloors} FLOORS`;
-  if (prizeUnlocked) {
+  const award = highestAward ? MILESTONES.find(({ type }) => type === highestAward) : null;
+  const nextAward = MILESTONES.find(({ floor }) => floor > floors);
+  if (award) {
     ui.resultKicker.textContent = 'SYMETRI PRIZE RUN';
-    ui.resultLevel.textContent = 'GOLD LIFT SECURED';
-    ui.gameOverTitle.textContent = 'PRIZE WON';
-    ui.resultMessage.textContent = `You landed the gold module and finished with ${floors} floors. Show this screen to the Symetri team.`;
+    ui.resultLevel.textContent = `${award.label} LIFT SECURED`;
+    ui.gameOverTitle.textContent = `${award.label} WON`;
+    ui.resultMessage.textContent = nextAward
+      ? `You landed the ${award.label.toLowerCase()} module and reached ${floors} floors. Next target: ${nextAward.label.toLowerCase()} at floor ${nextAward.floor}.`
+      : `You landed every prize module and finished with ${floors} floors. Show this screen to the Symetri team.`;
   } else if (isNewBest) {
     ui.resultKicker.textContent = 'PERSONAL RECORD';
     ui.resultLevel.textContent = `${floors} FLOORS`;
     ui.gameOverTitle.textContent = 'NEW HEIGHT';
-    ui.resultMessage.textContent = `Your tallest structure yet. Only ${Math.max(0, PRIZE_FLOOR - floors)} floors to the gold lift.`;
+    ui.resultMessage.textContent = nextAward ? `Your tallest structure yet. Only ${nextAward.floor - floors} floors to the ${nextAward.label.toLowerCase()} lift.` : 'Your tallest structure yet. Every prize milestone is below you.';
   } else if (floors >= 10) {
     ui.resultKicker.textContent = 'STRUCTURAL REPORT';
     ui.resultLevel.textContent = 'STRONG RUN';
     ui.gameOverTitle.textContent = 'STRONG BUILD';
-    ui.resultMessage.textContent = `${floors} floors held. The gold lift is ${Math.max(0, PRIZE_FLOOR - floors)} floors away.`;
+    ui.resultMessage.textContent = nextAward ? `${floors} floors held. The ${nextAward.label.toLowerCase()} lift is ${nextAward.floor - floors} floors away.` : `${floors} floors held. Every prize milestone was cleared.`;
   } else if (floors >= 5) {
     ui.resultKicker.textContent = 'STRUCTURAL REPORT';
     ui.resultLevel.textContent = 'SOLID RUN';
@@ -845,21 +873,28 @@ function showGameOver() {
     ui.resultKicker.textContent = 'STRUCTURAL REPORT';
     ui.resultLevel.textContent = 'RUN COMPLETE';
     ui.gameOverTitle.textContent = 'BUILD AGAIN';
-    ui.resultMessage.textContent = `You were ${PRIZE_FLOOR - floors} floors from the gold lift. One tap starts the next build.`;
+    ui.resultMessage.textContent = `You were ${MILESTONES[0].floor - floors} floors from the bronze lift. One tap starts the next build.`;
   }
-  ui.prizeResult.hidden = !prizeUnlocked;
+  ui.prizeResult.hidden = !award;
+  ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
+  if (award) {
+    ui.prizeResult.classList.add(award.type);
+    ui.prizeResultTitle.textContent = `${award.label} PRIZE UNLOCKED`;
+    ui.prizeResultText.textContent = `YOU LANDED THE ${award.label} LIFT`;
+  }
   ui.over.hidden = false;
-  const celebrate = prizeUnlocked || isNewBest || floors >= 10;
+  const celebrate = Boolean(award) || isNewBest || floors >= 10;
   ui.over.classList.toggle('celebrate', celebrate);
-  requestAnimationFrame(() => createResultCelebration(prizeUnlocked ? 46 : celebrate ? 30 : 16, prizeUnlocked));
-  playResultFanfare(prizeUnlocked, celebrate);
+  requestAnimationFrame(() => createResultCelebration(award ? 46 : celebrate ? 30 : 16, award?.type));
+  playResultFanfare(award?.type, celebrate);
 }
 
-function createResultCelebration(count, goldRun) {
+function createResultCelebration(count, awardType = null) {
   ui.celebration.replaceChildren();
   for (let i = 0; i < count; i++) {
     const piece = document.createElement('i');
-    if (goldRun || Math.random() > 0.58) piece.classList.add('gold');
+    if (awardType) piece.classList.add(awardType);
+    else if (Math.random() > 0.58) piece.classList.add('gold');
     piece.style.left = `${Math.random() * 100}%`;
     piece.style.setProperty('--delay', `${Math.random() * 0.75}s`);
     piece.style.setProperty('--duration', `${1.8 + Math.random() * 1.6}s`);
@@ -876,14 +911,21 @@ function updateUI() {
 }
 
 function updatePrizeUI() {
-  if (prizeUnlocked) {
-    ui.prizeProgress.textContent = 'PRIZE SECURED';
-  } else if (falling?.type === 'prize') {
-    ui.prizeProgress.textContent = 'GOLD LIFT IN AIR';
-  } else {
-    const remaining = Math.max(0, PRIZE_FLOOR - floors);
-    ui.prizeProgress.textContent = `${remaining} ${remaining === 1 ? 'FLOOR' : 'FLOORS'} TO GO`;
+  const airborneAward = MILESTONES.find(({ type }) => type === falling?.type);
+  const nextAward = MILESTONES.find(({ floor }) => floor > floors);
+  const activeAward = airborneAward || nextAward || MILESTONES[MILESTONES.length - 1];
+  ui.prizeReadout.classList.remove('bronze', 'silver', 'gold');
+  ui.prizeReadout.classList.add(activeAward.type);
+  if (airborneAward) {
+    ui.prizeProgress.textContent = `${airborneAward.label} LIFT IN AIR`;
+    return;
   }
+  if (!nextAward) {
+    ui.prizeProgress.textContent = 'ALL PRIZES SECURED';
+    return;
+  }
+  const remaining = nextAward.floor - floors;
+  ui.prizeProgress.textContent = `${nextAward.label} · ${remaining} ${remaining === 1 ? 'FLOOR' : 'FLOORS'}`;
 }
 
 function showFeedback(text, style = false) {
@@ -983,7 +1025,7 @@ function textPlane(text, width, height, color) {
 }
 
 function elementLabel(type) {
-  return ({ slab: 'CONCRETE SLAB', module: 'PREFAB MODULE', beam: 'STEEL FRAME', facade: 'FAÇADE ELEMENT', smart: 'SMART MODULE', prize: 'GOLD PRIZE LIFT' })[type];
+  return ({ slab: 'CONCRETE SLAB', module: 'PREFAB MODULE', beam: 'STEEL FRAME', facade: 'FAÇADE ELEMENT', smart: 'SMART MODULE', bronze: 'BRONZE PRIZE LIFT', silver: 'SILVER PRIZE LIFT', gold: 'GOLD PRIZE LIFT' })[type];
 }
 
 function initAudio() {
@@ -1060,9 +1102,10 @@ function playPrize() {
   [523, 659, 784, 1047].forEach((note, index) => playTone(note, 0.34, index < 2 ? 'triangle' : 'sine', 0.034, index * 0.09));
 }
 
-function playResultFanfare(goldRun, celebrate) {
-  if (goldRun) {
-    [392, 523, 659, 784, 1047].forEach((note, index) => playTone(note, 0.42, 'sine', 0.03, index * 0.085));
+function playResultFanfare(awardType, celebrate) {
+  if (awardType) {
+    const notes = awardType === 'gold' ? [392, 523, 659, 784, 1047] : [392, 523, 659, 784];
+    notes.forEach((note, index) => playTone(note, 0.42, 'sine', 0.03, index * 0.085));
     playNoise(0.35, 0.018, 720, 'bandpass');
   } else if (celebrate) {
     [330, 440, 554].forEach((note, index) => playTone(note, 0.32, index === 0 ? 'triangle' : 'sine', 0.026, index * 0.08));
@@ -1088,6 +1131,7 @@ function updateSoundButton() {
 ui.play.addEventListener('click', startGame);
 ui.replay.addEventListener('click', startGame);
 ui.home.addEventListener('click', returnHome);
+ui.restart.addEventListener('click', startGame);
 ui.sound.addEventListener('click', event => {
   event.stopPropagation();
   soundOn = !soundOn;

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f1efe9">
   <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
   <title>Stack Smarter | Symetri</title>
-  <link rel="stylesheet" href="styles.css?v=20260827-6">
+  <link rel="stylesheet" href="styles.css?v=20260827-7">
 </head>
 <body>
   <main id="app" aria-label="Stack Smarter game">
@@ -19,6 +19,9 @@
       <div class="top-actions">
         <button id="homeButton" class="icon-button" type="button" aria-label="Back to start" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 11 8-7 8 7v9h-6v-6h-4v6H4v-9Z"/></svg>
+        </button>
+        <button id="restartButton" class="icon-button" type="button" aria-label="Start over" title="Start over" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M19 12a7 7 0 1 0-1.2 5.1"/></svg>
         </button>
         <button id="soundButton" class="icon-button" type="button" aria-label="Turn sound off" aria-pressed="true">
           <svg class="sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.3-1.3a6 6 0 0 1 0 8.6M18.8 5.2a9.5 9.5 0 0 1 0 13.6"/></svg>
@@ -48,7 +51,7 @@
       <div class="readout-block prize-readout">
         <span class="readout-label">PRIZE LIFT</span>
         <strong id="prizeProgress">12 FLOORS TO GO</strong>
-        <small>LAND THE GOLD MODULE</small>
+        <small>BRONZE · SILVER · GOLD</small>
       </div>
     </section>
 
@@ -62,7 +65,7 @@
         <p class="eyebrow">SYMETRI × BIM WORLD COPENHAGEN</p>
         <h1>STACK<br><span>SMARTER</span></h1>
         <p class="lede">Build higher. Place smarter.<br>How far can you take it?</p>
-        <p class="prize-teaser"><i aria-hidden="true"></i> LAND THE GOLD MODULE AT LEVEL 15</p>
+        <p class="prize-teaser"><i aria-hidden="true"></i> BRONZE 15 · SILVER 20 · GOLD 30</p>
         <button id="playButton" class="primary-button" type="button"><span>PLAY</span><i aria-hidden="true">→</i></button>
         <p class="tap-hint">TAP ANYWHERE TO DROP</p>
         <nav class="symetri-links" aria-label="More from Symetri">
@@ -85,8 +88,8 @@
         </div>
         <p id="bestLine" class="best-line">BEST 0 · 0 FLOORS</p>
         <div id="prizeResult" class="prize-result" hidden>
-          <span>PRIZE UNLOCKED</span>
-          <strong>YOU LANDED THE GOLD LIFT</strong>
+          <span id="prizeResultTitle">PRIZE UNLOCKED</span>
+          <strong id="prizeResultText">YOU LANDED THE BRONZE LIFT</strong>
           <small>Show this screen to the Symetri team.</small>
         </div>
         <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
@@ -95,6 +98,6 @@
 
     <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
   </main>
-  <script type="module" src="game.js?v=20260827-6"></script>
+  <script type="module" src="game.js?v=20260827-7"></script>
 </body>
 </html>
