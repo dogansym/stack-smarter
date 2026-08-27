@@ -133,13 +133,13 @@ function buildSite() {
   grid.position.y = 0.012;
   world.add(grid);
   createFence(0, -5.8, 19, 0);
-  createFence(8.8, -1.5, 8.5, Math.PI / 2);
-  createContainer(5.9, 0, -3.7);
+  createFence(8.8, 1.35, 5.2, Math.PI / 2);
+  createContainer(5.85, 0, -4.18);
   createPallet(-3.8, 0, -4.5);
   createWindSock(1.8, -4.6);
   createCitySilhouette();
-  const workSign = imagePlane(workTexture, 3.05, 0.448, false);
-  workSign.position.set(-2.8, 0.92, -5.758);
+  const workSign = imagePlane(workTexture, 1.68, 0.247, false);
+  workSign.position.set(-3, 0.82, -5.758);
   world.add(workSign);
 }
 
