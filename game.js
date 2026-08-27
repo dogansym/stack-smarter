@@ -27,7 +27,10 @@ let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
 let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
 let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0, windSock = null;
 let prizeUnlocked = false;
-let wind = { speed: 3.2, fromAngle: Math.PI * 1.75, vector: new THREE.Vector3(0.7, 0, 0.7), label: 'NW' };
+let wind = {
+  baseSpeed: 3.2, currentSpeed: 3.2, fromAngle: Math.PI * 1.75,
+  vector: new THREE.Vector3(0.7, 0, 0.7), label: 'NW', calm: false, gustDepth: 0.16, gustPhase: 0
+};
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.paper);
@@ -323,7 +326,6 @@ function createFoundation() {
 }
 
 function spawnLoad(preview = false) {
-  setWind(preview);
   const type = chooseType(), dims = dimensionsFor(type), object = createElement(type, dims);
   loadSerial++;
   craneY = Math.max(13, towerTop + 10.6);
@@ -361,19 +363,22 @@ function setWind(preview = false) {
     ['S', Math.PI], ['SW', Math.PI * 1.25], ['W', Math.PI * 1.5], ['NW', Math.PI * 1.75]
   ];
   const selected = preview ? directions[7] : directions[Math.floor(Math.random() * directions.length)];
-  const speed = preview ? 3.2 : 1.4 + Math.random() * Math.min(4.3, 2.8 + floors * 0.09);
+  const calm = !preview && Math.random() < 0.08;
+  const baseSpeed = preview ? 3.2 : calm ? 0.6 + Math.random() * 0.4 : 2.5 + Math.random() * 3.8;
   const fromAngle = selected[1];
   wind = {
-    label: selected[0], fromAngle, speed,
+    label: selected[0], fromAngle, baseSpeed, currentSpeed: baseSpeed, calm,
+    gustDepth: calm ? 0.07 : 0.13 + Math.random() * 0.12,
+    gustPhase: Math.random() * Math.PI * 2,
     vector: new THREE.Vector3(Math.sin(fromAngle + Math.PI), 0, Math.cos(fromAngle + Math.PI)).normalize()
   };
   updateWeatherUI();
 }
 
 function updateWeatherUI() {
-  ui.windValue.textContent = `FROM ${wind.label} · ${wind.speed.toFixed(1)} M/S`;
+  ui.windValue.textContent = `FROM ${wind.label} · ${wind.baseSpeed.toFixed(1)} M/S`;
   ui.windArrow.style.transform = `rotate(${wind.fromAngle + Math.PI}rad)`;
-  const activeBars = Math.max(1, Math.ceil(wind.speed / 1.15));
+  const activeBars = Math.max(1, Math.ceil(wind.baseSpeed / 1.3));
   [...ui.gustMeter.children].forEach((bar, index) => bar.classList.toggle('active', index < activeBars));
 }
 
@@ -621,17 +626,20 @@ function updateLoad(dt) {
     lastLoadX = f.x;
     const trolleyX = Math.sin(swingTime * swingSpeed + f.phase) * range;
     const pendulum = Math.sin(swingTime * swingSpeed * 1.34 + f.phase + 0.52);
-    f.x = trolleyX - pendulum * (0.38 + floors * 0.006) + wind.vector.x * wind.speed * 0.022;
-    f.z = Math.sin(swingTime * 1.63 + f.phase) * (0.25 + Math.min(0.22, floors * 0.009)) + wind.vector.z * wind.speed * 0.022;
+    const gustWave = Math.sin(swingTime * (1.05 + wind.currentSpeed * 0.04) + wind.gustPhase + f.phase * 0.35);
+    const windPush = wind.currentSpeed * (0.025 + gustWave * 0.055);
+    const pendulumAmplitude = 0.28 + floors * 0.006 + wind.currentSpeed * 0.035;
+    f.x = trolleyX - pendulum * pendulumAmplitude + wind.vector.x * windPush;
+    f.z = Math.sin(swingTime * 1.63 + f.phase) * (0.18 + Math.min(0.22, floors * 0.009) + wind.currentSpeed * 0.018) + wind.vector.z * windPush;
     f.y = craneY - f.cable - f.h / 2 + Math.abs(pendulum) * 0.045;
-    f.object.rotation.z = -pendulum * (0.09 + Math.min(0.07, floors * 0.003));
-    f.object.rotation.x = Math.cos(swingTime * 1.58 + f.phase) * 0.045;
+    f.object.rotation.z = -pendulum * (0.075 + Math.min(0.07, floors * 0.003) + wind.currentSpeed * 0.008) + wind.vector.x * gustWave * wind.currentSpeed * 0.008;
+    f.object.rotation.x = Math.cos(swingTime * 1.58 + f.phase) * (0.03 + wind.currentSpeed * 0.006) + wind.vector.z * gustWave * wind.currentSpeed * 0.006;
     f.object.rotation.y = Math.sin(swingTime * 0.83) * 0.035;
     craneParts.trolley.position.x = trolleyX;
   } else if (f.state === 'drop') {
     f.vy -= 9.8 * dt;
-    f.vx += wind.vector.x * wind.speed * 0.115 * dt;
-    f.vz += wind.vector.z * wind.speed * 0.115 * dt;
+    f.vx += wind.vector.x * wind.currentSpeed * 0.115 * dt;
+    f.vz += wind.vector.z * wind.currentSpeed * 0.115 * dt;
     f.x += f.vx * dt;
     f.y += f.vy * dt;
     f.z += f.vz * dt;
@@ -758,6 +766,7 @@ function startGame() {
   ui.over.hidden = true;
   ui.prizeResult.hidden = true;
   ui.siteReadout.hidden = false;
+  setWind(false);
   ui.hud.classList.add('visible');
   resetStructure();
   updateUI();
@@ -810,6 +819,9 @@ function showFeedback(text, style = false) {
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.034);
   swingTime += dt;
+  const slowGust = Math.sin(swingTime * 0.52 + wind.gustPhase) * wind.gustDepth;
+  const softFlutter = Math.sin(swingTime * 1.31 + wind.gustPhase * 0.7) * wind.gustDepth * 0.28;
+  wind.currentSpeed = Math.max(0.35, wind.baseSpeed * (1 + slowGust + softFlutter));
   if (mode === 'start' && falling) swingSpeed = 0.75;
   updateLoad(dt);
   updateImpacts(dt);
@@ -818,7 +830,7 @@ function animate() {
   updateCamera(dt);
   if (windSock) {
     windSock.rotation.y = THREE.MathUtils.damp(windSock.rotation.y, Math.atan2(-wind.vector.z, wind.vector.x), 4, dt);
-    windSock.rotation.z = Math.sin(swingTime * (4 + wind.speed * 0.4)) * 0.035;
+    windSock.rotation.z = Math.sin(swingTime * (4 + wind.currentSpeed * 0.4)) * (0.018 + wind.currentSpeed * 0.004);
   }
   impactFlash = Math.max(0, impactFlash - dt * 5);
   renderer.toneMappingExposure = 1.04 + impactFlash * 0.045;
@@ -937,7 +949,7 @@ function playNoise(duration, volume, frequency, filterType = 'bandpass', delay =
 function playRelease() {
   playTone(185, 0.075, 'square', 0.024);
   playTone(820, 0.045, 'triangle', 0.018, 0.018);
-  playNoise(0.34, 0.022 + wind.speed * 0.0015, 480 + wind.speed * 85, 'bandpass', 0.025);
+  playNoise(0.34, 0.022 + wind.currentSpeed * 0.0015, 480 + wind.currentSpeed * 85, 'bandpass', 0.025);
 }
 
 function playCraneCue() {
