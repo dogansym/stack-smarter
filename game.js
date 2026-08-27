@@ -4,8 +4,9 @@ const $ = (selector) => document.querySelector(selector);
 const canvas = $('#game');
 const ui = {
   start: $('#startScreen'), over: $('#gameOverScreen'), hud: $('#hud'),
-  floors: $('#floors'), score: $('#score'), multiplier: $('#multiplier'),
-  finalScore: $('#finalScore'), finalFloors: $('#finalFloors'), best: $('#bestLine'),
+  floors: $('#floors'), score: $('#score'), finalScore: $('#finalScore'), finalFloors: $('#finalFloors'), best: $('#bestLine'),
+  resultKicker: $('#resultKicker'), resultLevel: $('#resultLevel'), gameOverTitle: $('#gameOverTitle'),
+  resultMessage: $('#resultMessage'), celebration: $('#resultCelebration'),
   feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'), home: $('#homeButton'),
   siteReadout: $('#siteReadout'), windArrow: $('#windArrow'), windValue: $('#windValue'),
   windSpeed: $('#windSpeed'), windState: $('#windState'), gustMeter: $('#gustMeter'),
@@ -17,11 +18,11 @@ const C = {
   concrete: 0xb8b6af, concreteTop: 0xd1cfc8, steel: 0x444a4a, glass: 0x84bcc5,
   white: 0xe9e8e3, soil: 0xd7d3ca, gold: 0xc7a354
 };
-const PRIZE_FLOOR = 12;
+const PRIZE_FLOOR = 15;
 const UP = new THREE.Vector3(0, 1, 0);
 const clock = new THREE.Clock();
 
-let mode = 'start', score = 0, floors = 0, combo = 0, multiplier = 1, instability = 0;
+let mode = 'start', score = 0, floors = 0, combo = 0, instability = 0;
 let towerTop = 0.42, swingTime = 0, swingSpeed = 1.18, falling = null;
 let blocks = [], bodies = [], particles = [];
 let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
@@ -466,7 +467,7 @@ function createElement(type, dims) {
     const logo = imagePlane(logoTexture, 1.68, 0.648, false);
     logo.position.set(-dims.w * 0.2, 0, dims.d / 2 + 0.055);
     group.add(logo);
-    const prizeText = textPlane('GOLD LIFT · LEVEL 12', 2.05, 0.38, '#ffffff');
+    const prizeText = textPlane('GOLD LIFT · LEVEL 15', 2.05, 0.38, '#ffffff');
     prizeText.position.set(dims.w * 0.22, 0, dims.d / 2 + 0.06);
     group.add(prizeText);
   } else {
@@ -536,16 +537,14 @@ function landLoad() {
   floors++;
   if (perfect) {
     combo++;
-    multiplier = Math.min(5, 1 + Math.floor(combo / 2));
-    score += (120 + floors * 5) * multiplier;
+    score += 120 + floors * 5 + Math.min(combo, 6) * 25;
     instability = Math.max(0, instability - 0.12);
-    showFeedback(combo > 1 ? `PERFECT DROP · ×${multiplier}` : 'PERFECT DROP', true);
+    showFeedback(combo > 1 ? `PERFECT STREAK · ${combo}` : 'PERFECT DROP', true);
     spawnParticles(f.x, towerTop + 0.05, f.z, C.glacier, 20, 1.35);
     spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 1.25);
     playChord(590 + combo * 22);
   } else if (nearPerfect) {
     combo = 0;
-    multiplier = 1;
     score += Math.round(102 + accuracy * 48 + floors * 3);
     instability = Math.max(0, instability - 0.035 + (1 - supportRatio) * 0.045);
     showFeedback(`ALMOST PERFECT · ${Math.round(accuracy * 100)}%`, 'near');
@@ -554,7 +553,6 @@ function landLoad() {
     playNearPerfect(accuracy);
   } else {
     combo = 0;
-    multiplier = 1;
     score += Math.round(38 + accuracy * 68 + floors * 3);
     const overhangRisk = Math.pow(1 - supportRatio, 1.18) * 0.52;
     instability += overhangRisk + normalizedOffset * 0.16 + tilt * 0.66;
@@ -586,7 +584,6 @@ function beginCollapse(extraLoad = null) {
   if (mode !== 'playing') return;
   mode = 'collapse';
   combo = 0;
-  multiplier = 1;
   updateUI();
   showFeedback('COLLAPSE', false);
   shake = 0.72;
@@ -778,7 +775,6 @@ function startGame() {
   playTone(250, 0.07, 'sine', 0.035);
   mode = 'playing';
   score = floors = combo = 0;
-  multiplier = 1;
   instability = 0;
   prizeUnlocked = false;
   swingTime = 0;
@@ -786,6 +782,8 @@ function startGame() {
   loadSerial = 0;
   ui.start.hidden = true;
   ui.over.hidden = true;
+  ui.over.classList.remove('celebrate');
+  ui.celebration.replaceChildren();
   ui.prizeResult.hidden = true;
   ui.siteReadout.hidden = false;
   ui.home.hidden = false;
@@ -799,6 +797,8 @@ function returnHome() {
   mode = 'start';
   ui.start.hidden = false;
   ui.over.hidden = true;
+  ui.over.classList.remove('celebrate');
+  ui.celebration.replaceChildren();
   ui.hud.classList.remove('visible');
   ui.siteReadout.hidden = true;
   ui.home.hidden = true;
@@ -814,20 +814,64 @@ function showGameOver() {
   ui.siteReadout.hidden = true;
   const previousScore = Number(localStorage.getItem('stack-smarter-best') || 0);
   const previousFloors = Number(localStorage.getItem('stack-smarter-best-floors') || 0);
+  const isNewBest = score > previousScore || floors > previousFloors;
   const bestScore = Math.max(previousScore, score), bestFloors = Math.max(previousFloors, floors);
   localStorage.setItem('stack-smarter-best', String(bestScore));
   localStorage.setItem('stack-smarter-best-floors', String(bestFloors));
   ui.finalScore.textContent = score.toLocaleString();
   ui.finalFloors.textContent = floors;
-  ui.best.textContent = score > previousScore || floors > previousFloors ? `NEW BEST · ${bestScore.toLocaleString()} · ${bestFloors} FLOORS` : `BEST ${bestScore.toLocaleString()} · ${bestFloors} FLOORS`;
+  ui.best.textContent = isNewBest ? `NEW BEST · ${bestScore.toLocaleString()} · ${bestFloors} FLOORS` : `BEST ${bestScore.toLocaleString()} · ${bestFloors} FLOORS`;
+  if (prizeUnlocked) {
+    ui.resultKicker.textContent = 'SYMETRI PRIZE RUN';
+    ui.resultLevel.textContent = 'GOLD LIFT SECURED';
+    ui.gameOverTitle.textContent = 'PRIZE WON';
+    ui.resultMessage.textContent = `You landed the gold module and finished with ${floors} floors. Show this screen to the Symetri team.`;
+  } else if (isNewBest) {
+    ui.resultKicker.textContent = 'PERSONAL RECORD';
+    ui.resultLevel.textContent = `${floors} FLOORS`;
+    ui.gameOverTitle.textContent = 'NEW HEIGHT';
+    ui.resultMessage.textContent = `Your tallest structure yet. Only ${Math.max(0, PRIZE_FLOOR - floors)} floors to the gold lift.`;
+  } else if (floors >= 10) {
+    ui.resultKicker.textContent = 'STRUCTURAL REPORT';
+    ui.resultLevel.textContent = 'STRONG RUN';
+    ui.gameOverTitle.textContent = 'STRONG BUILD';
+    ui.resultMessage.textContent = `${floors} floors held. The gold lift is ${Math.max(0, PRIZE_FLOOR - floors)} floors away.`;
+  } else if (floors >= 5) {
+    ui.resultKicker.textContent = 'STRUCTURAL REPORT';
+    ui.resultLevel.textContent = 'SOLID RUN';
+    ui.gameOverTitle.textContent = 'NICE STACK';
+    ui.resultMessage.textContent = `${floors} floors complete. Read the wind and tighten the next placement.`;
+  } else {
+    ui.resultKicker.textContent = 'STRUCTURAL REPORT';
+    ui.resultLevel.textContent = 'RUN COMPLETE';
+    ui.gameOverTitle.textContent = 'BUILD AGAIN';
+    ui.resultMessage.textContent = `You were ${PRIZE_FLOOR - floors} floors from the gold lift. One tap starts the next build.`;
+  }
   ui.prizeResult.hidden = !prizeUnlocked;
   ui.over.hidden = false;
+  const celebrate = prizeUnlocked || isNewBest || floors >= 10;
+  ui.over.classList.toggle('celebrate', celebrate);
+  requestAnimationFrame(() => createResultCelebration(prizeUnlocked ? 46 : celebrate ? 30 : 16, prizeUnlocked));
+  playResultFanfare(prizeUnlocked, celebrate);
+}
+
+function createResultCelebration(count, goldRun) {
+  ui.celebration.replaceChildren();
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('i');
+    if (goldRun || Math.random() > 0.58) piece.classList.add('gold');
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.setProperty('--delay', `${Math.random() * 0.75}s`);
+    piece.style.setProperty('--duration', `${1.8 + Math.random() * 1.6}s`);
+    piece.style.setProperty('--drift', `${-90 + Math.random() * 180}px`);
+    piece.style.setProperty('--spin', `${360 + Math.random() * 900}deg`);
+    ui.celebration.append(piece);
+  }
 }
 
 function updateUI() {
   ui.floors.textContent = floors;
   ui.score.textContent = String(score).padStart(4, '0');
-  ui.multiplier.textContent = `×${multiplier}`;
   updatePrizeUI();
 }
 
@@ -1014,6 +1058,18 @@ function playNearPerfect(accuracy) {
 function playPrize() {
   playNoise(0.22, 0.028, 260, 'lowpass');
   [523, 659, 784, 1047].forEach((note, index) => playTone(note, 0.34, index < 2 ? 'triangle' : 'sine', 0.034, index * 0.09));
+}
+
+function playResultFanfare(goldRun, celebrate) {
+  if (goldRun) {
+    [392, 523, 659, 784, 1047].forEach((note, index) => playTone(note, 0.42, 'sine', 0.03, index * 0.085));
+    playNoise(0.35, 0.018, 720, 'bandpass');
+  } else if (celebrate) {
+    [330, 440, 554].forEach((note, index) => playTone(note, 0.32, index === 0 ? 'triangle' : 'sine', 0.026, index * 0.08));
+  } else {
+    playTone(260, 0.18, 'triangle', 0.02);
+    playTone(330, 0.22, 'sine', 0.015, 0.08);
+  }
 }
 
 function playCollapse() {

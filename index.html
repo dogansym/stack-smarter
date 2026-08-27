@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f1efe9">
   <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
   <title>Stack Smarter | Symetri</title>
-  <link rel="stylesheet" href="styles.css?v=20260827-5">
+  <link rel="stylesheet" href="styles.css?v=20260827-6">
 </head>
 <body>
   <main id="app" aria-label="Stack Smarter game">
@@ -29,7 +29,6 @@
 
     <section id="hud" class="hud" aria-live="polite">
       <div><span>FLOORS</span><strong id="floors">0</strong></div>
-      <div class="multiplier"><span>MULTIPLIER</span><strong id="multiplier">×1</strong></div>
       <div class="score"><span>SCORE</span><strong id="score">0000</strong></div>
     </section>
 
@@ -63,7 +62,7 @@
         <p class="eyebrow">SYMETRI × BIM WORLD COPENHAGEN</p>
         <h1>STACK<br><span>SMARTER</span></h1>
         <p class="lede">Build higher. Place smarter.<br>How far can you take it?</p>
-        <p class="prize-teaser"><i aria-hidden="true"></i> LAND THE GOLD MODULE AT LEVEL 12</p>
+        <p class="prize-teaser"><i aria-hidden="true"></i> LAND THE GOLD MODULE AT LEVEL 15</p>
         <button id="playButton" class="primary-button" type="button"><span>PLAY</span><i aria-hidden="true">→</i></button>
         <p class="tap-hint">TAP ANYWHERE TO DROP</p>
         <nav class="symetri-links" aria-label="More from Symetri">
@@ -75,9 +74,11 @@
     </section>
 
     <section id="gameOverScreen" class="screen gameover-screen" hidden>
+      <div id="resultCelebration" class="result-celebration" aria-hidden="true"></div>
       <div class="panel gameover-panel">
-        <p class="eyebrow">STRUCTURAL REPORT</p>
-        <h2>COLLAPSE</h2>
+        <div class="result-header"><p id="resultKicker" class="eyebrow">STRUCTURAL REPORT</p><span id="resultLevel">RUN COMPLETE</span></div>
+        <h2 id="gameOverTitle">NICE STACK</h2>
+        <p id="resultMessage" class="result-message">A solid start. Stack smarter and go higher.</p>
         <div class="results">
           <div><span>SCORE</span><strong id="finalScore">0</strong></div>
           <div><span>FLOORS</span><strong id="finalFloors">0</strong></div>
@@ -94,6 +95,6 @@
 
     <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
   </main>
-  <script type="module" src="game.js?v=20260827-5"></script>
+  <script type="module" src="game.js?v=20260827-6"></script>
 </body>
 </html>
