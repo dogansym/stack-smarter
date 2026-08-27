@@ -7,7 +7,7 @@ const ui = {
   floors: $('#floors'), score: $('#score'), finalScore: $('#finalScore'), finalFloors: $('#finalFloors'), best: $('#bestLine'),
   resultKicker: $('#resultKicker'), resultLevel: $('#resultLevel'), gameOverTitle: $('#gameOverTitle'),
   resultMessage: $('#resultMessage'), celebration: $('#resultCelebration'),
-  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), sound: $('#soundButton'), home: $('#homeButton'), restart: $('#restartButton'),
+  feedback: $('#feedback'), play: $('#playButton'), replay: $('#replayButton'), home: $('#homeButton'), restart: $('#restartButton'),
   siteReadout: $('#siteReadout'), windArrow: $('#windArrow'), windValue: $('#windValue'),
   windSpeed: $('#windSpeed'), windState: $('#windState'), gustMeter: $('#gustMeter'),
   prizeProgress: $('#prizeProgress'), prizeReadout: document.querySelector('.prize-readout'), prizeResult: $('#prizeResult'),
@@ -33,7 +33,7 @@ let mode = 'start', score = 0, floors = 0, combo = 0, instability = 0;
 let towerTop = 0.42, swingTime = 0, swingSpeed = 1.18, falling = null;
 let blocks = [], bodies = [], particles = [];
 let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
-let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
+const soundOn = true;
 let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0;
 const windTurbines = [];
 let siteContainer = null;
@@ -73,7 +73,6 @@ buildSite();
 const craneParts = buildCrane();
 resetStructure(true);
 resize();
-updateSoundButton();
 renderer.setAnimationLoop(animate);
 
 function createMaterials() {
@@ -483,10 +482,12 @@ function updateWeatherUI() {
   const heightMultiplier = heightWindMultiplier();
   const exposedSpeed = wind.baseSpeed * heightMultiplier;
   const exposure = Math.round((heightMultiplier - 1) * 100);
+  const flag = exposedSpeed < 3.2 ? 'green' : exposedSpeed < 4 ? 'yellow' : exposedSpeed < 4.7 ? 'orange' : 'red';
+  ui.siteReadout.classList.remove('wind-green', 'wind-yellow', 'wind-orange', 'wind-red');
+  ui.siteReadout.classList.add(`wind-${flag}`);
   ui.windValue.textContent = `FROM ${wind.label} · ${degrees}°`;
   ui.windSpeed.textContent = exposedSpeed.toFixed(1);
-  const flowLabel = floors >= 20 ? 'HIGH-RISE FLOW' : floors >= 8 ? 'EXPOSED FLOW' : wind.calm ? 'LIGHT AIR' : 'STEADY FLOW';
-  ui.windState.textContent = exposure > 0 ? `${flowLabel} · +${exposure}% AT HEIGHT` : `${flowLabel} · DRY 16°C`;
+  ui.windState.textContent = exposure > 0 ? `${flag.toUpperCase()} FLAG · +${exposure}% AT HEIGHT` : `${flag.toUpperCase()} FLAG · DRY 16°C`;
   ui.windArrow.style.transform = `rotate(${wind.fromAngle + Math.PI}rad)`;
   const activeBars = Math.max(1, Math.ceil(exposedSpeed / 1.7));
   [...ui.gustMeter.children].forEach((bar, index) => bar.classList.toggle('active', index < activeBars));
@@ -1234,23 +1235,10 @@ function playCollapse() {
   playNoise(1.1, 0.055, 135, 'lowpass');
 }
 
-function updateSoundButton() {
-  ui.sound.classList.toggle('muted', !soundOn);
-  ui.sound.setAttribute('aria-pressed', String(soundOn));
-  ui.sound.setAttribute('aria-label', soundOn ? 'Turn sound off' : 'Turn sound on');
-}
-
 ui.play.addEventListener('click', startGame);
 ui.replay.addEventListener('click', startGame);
 ui.home.addEventListener('click', returnHome);
 ui.restart.addEventListener('click', startGame);
-ui.sound.addEventListener('click', event => {
-  event.stopPropagation();
-  soundOn = !soundOn;
-  localStorage.setItem('stack-smarter-sound', soundOn ? 'on' : 'off');
-  updateSoundButton();
-  if (soundOn) playTone(440, 0.07);
-});
 canvas.addEventListener('pointerdown', event => { event.preventDefault(); releaseLoad(); });
 addEventListener('keydown', event => {
   if ((event.code === 'Space' || event.code === 'Enter') && mode === 'playing') { event.preventDefault(); releaseLoad(); }
