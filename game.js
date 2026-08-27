@@ -22,7 +22,6 @@ const UP = new THREE.Vector3(0, 1, 0);
 const clock = new THREE.Clock();
 
 let mode = 'start', score = 0, floors = 0, combo = 0, multiplier = 1, instability = 0;
-let smartAssists = 2;
 let towerTop = 0.42, swingTime = 0, swingSpeed = 1.18, falling = null;
 let blocks = [], bodies = [], particles = [];
 let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
@@ -510,23 +509,11 @@ function releaseLoad() {
 
 function landLoad() {
   const support = blocks[blocks.length - 1], f = falling;
-  const guideStrength = Math.max(0.08, 0.24 - floors * 0.006);
-  if (Math.abs(f.x - support.x) < support.w * 0.22) f.x = THREE.MathUtils.lerp(f.x, support.x, guideStrength);
-  if (Math.abs(f.z - support.z) < support.d * 0.22) f.z = THREE.MathUtils.lerp(f.z, support.z, guideStrength);
-  const measureSupport = () => {
-    const overlapX = Math.max(0, Math.min(f.x + f.w / 2, support.x + support.w / 2) - Math.max(f.x - f.w / 2, support.x - support.w / 2));
-    const overlapZ = Math.max(0, Math.min(f.z + f.d / 2, support.z + support.d / 2) - Math.max(f.z - f.d / 2, support.z - support.d / 2));
-    const ratioX = overlapX / Math.min(f.w, support.w), ratioZ = overlapZ / Math.min(f.d, support.d);
-    return ratioX * ratioZ;
-  };
-  let supportRatio = measureSupport(), assisted = false;
-  if (supportRatio >= 0.11 && supportRatio < 0.2 && smartAssists > 0) {
-    f.x = THREE.MathUtils.lerp(f.x, support.x, 0.55);
-    f.z = THREE.MathUtils.lerp(f.z, support.z, 0.55);
-    supportRatio = measureSupport();
-    if (supportRatio >= 0.16) { assisted = true; smartAssists--; }
-  }
-  if (supportRatio < 0.16) { beginCollapse(f); return; }
+  const overlapX = Math.max(0, Math.min(f.x + f.w / 2, support.x + support.w / 2) - Math.max(f.x - f.w / 2, support.x - support.w / 2));
+  const overlapZ = Math.max(0, Math.min(f.z + f.d / 2, support.z + support.d / 2) - Math.max(f.z - f.d / 2, support.z - support.d / 2));
+  const ratioX = overlapX / Math.min(f.w, support.w), ratioZ = overlapZ / Math.min(f.d, support.d);
+  const supportRatio = ratioX * ratioZ;
+  if (supportRatio < 0.28) { beginCollapse(f); return; }
   const dx = f.x - support.x, dz = f.z - support.z;
   const normalizedOffset = Math.sqrt((dx / (support.w * 0.5)) ** 2 + (dz / (support.d * 0.5)) ** 2);
   const tilt = Math.min(0.18, (Math.abs(f.object.rotation.x) + Math.abs(f.object.rotation.z)) * 0.25);
@@ -536,8 +523,10 @@ function landLoad() {
   f.state = 'placed';
   f.y = towerTop + f.h / 2;
   f.object.position.set(f.x, f.y, f.z);
-  f.object.rotation.x *= 0.22;
-  f.object.rotation.z *= 0.22;
+  const landingLeanZ = THREE.MathUtils.clamp(-(f.x - support.x) / (support.w * 0.5) * 0.13, -0.12, 0.12);
+  const landingLeanX = THREE.MathUtils.clamp((f.z - support.z) / (support.d * 0.5) * 0.1, -0.09, 0.09);
+  f.object.rotation.x = THREE.MathUtils.lerp(f.object.rotation.x * 0.22, landingLeanX, 0.72);
+  f.object.rotation.z = THREE.MathUtils.lerp(f.object.rotation.z * 0.22, landingLeanZ, 0.72);
   f.object.userData.impact = {
     elapsed: 0, baseY: f.y, baseX: f.x, baseZ: f.z, baseRotZ: f.object.rotation.z,
     strength: 0.11 + Math.min(0.11, Math.abs(f.vy) * 0.018), near: nearPerfect || perfect
@@ -558,7 +547,7 @@ function landLoad() {
     combo = 0;
     multiplier = 1;
     score += Math.round(102 + accuracy * 48 + floors * 3);
-    instability = Math.max(0, instability + (1 - supportRatio) * 0.07 - 0.025);
+    instability = Math.max(0, instability - 0.035 + (1 - supportRatio) * 0.045);
     showFeedback(`ALMOST PERFECT · ${Math.round(accuracy * 100)}%`, 'near');
     spawnParticles(f.x, towerTop + 0.03, f.z, C.glacier, 17, 1.05);
     spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 1);
@@ -567,16 +556,11 @@ function landLoad() {
     combo = 0;
     multiplier = 1;
     score += Math.round(38 + accuracy * 68 + floors * 3);
-    const overhangRisk = Math.pow(1 - supportRatio, 1.25) * 0.31;
-    instability += overhangRisk + normalizedOffset * 0.095 + tilt * 0.46;
+    const overhangRisk = Math.pow(1 - supportRatio, 1.18) * 0.52;
+    instability += overhangRisk + normalizedOffset * 0.16 + tilt * 0.66;
     showFeedback(accuracy > 0.68 ? 'SOLID PLACEMENT' : elementLabel(f.type), false);
     spawnParticles(f.x, towerTop, f.z, 0xb3aea4, 13, 0.72);
     playImpact(accuracy);
-  }
-  if (assisted) {
-    showFeedback(`SMART ALIGN · ${smartAssists} LEFT`, 'near');
-    spawnImpactRing(f.x, towerTop + 0.04, f.z, C.glacier, 0.9);
-    playNearPerfect(0.76);
   }
   if (f.type === 'prize') {
     prizeUnlocked = true;
@@ -591,10 +575,10 @@ function landLoad() {
   shake = nearPerfect || perfect ? 0.15 : 0.065 + (1 - accuracy) * 0.12;
   impactFlash = 1;
   swingSpeed = Math.min(2.4, 1.18 + floors * 0.052);
-  cameraTargetY = Math.max(3.4, towerTop * 0.62 + 2.2);
+  cameraTargetY = Math.max(3.4, towerTop + 2.6);
   updateUI();
   falling = null;
-  if (instability > 1.45 && floors > 5) setTimeout(() => mode === 'playing' && beginCollapse(), 260);
+  if (instability > 1.12 && floors > 4) setTimeout(() => mode === 'playing' && beginCollapse(), 260);
   else setTimeout(() => mode === 'playing' && spawnLoad(), 230);
 }
 
@@ -773,10 +757,10 @@ function spawnImpactRing(x, y, z, color, growth) {
 function updateCamera(dt) {
   cameraFocusY = THREE.MathUtils.damp(cameraFocusY, cameraTargetY, 3.4, dt);
   const mobile = innerWidth < 700;
-  const pullback = THREE.MathUtils.clamp((towerTop - 4) * 0.42, 0, 9);
+  const pullback = THREE.MathUtils.clamp((towerTop - 4) * 0.68, 0, 14);
   const desired = new THREE.Vector3(
-    (mobile ? 10.8 : 11.8) + pullback * 0.52,
-    cameraFocusY + (mobile ? 7.2 : 6.4) + pullback * 0.22,
+    (mobile ? 10.8 : 11.8) + pullback * 0.46,
+    cameraFocusY + (mobile ? 7.2 : 6.4) + pullback * 0.16,
     (mobile ? 17.4 : 15.4) + pullback
   );
   camera.position.lerp(desired, 1 - Math.exp(-dt * 3.2));
@@ -796,7 +780,6 @@ function startGame() {
   score = floors = combo = 0;
   multiplier = 1;
   instability = 0;
-  smartAssists = 2;
   prizeUnlocked = false;
   swingTime = 0;
   swingSpeed = 1.18;
