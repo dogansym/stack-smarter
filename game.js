@@ -156,6 +156,7 @@ function buildSite() {
   createPallet(-3.8, 0, -4.5);
   createWindTurbine(-13.5, -17.5, 1.08);
   createWindTurbine(13.5, -22, 0.72);
+  createTreeCluster();
   createCitySilhouette();
   const workSign = imagePlane(workTexture, 1.68, 0.247, false);
   workSign.position.set(-3, 0.82, -5.758);
@@ -189,6 +190,37 @@ function createWindTurbine(x, z, scale) {
   group.scale.setScalar(scale);
   world.add(group);
   windTurbines.push({ rotor, offset: Math.random() * Math.PI * 2 });
+}
+
+function createTreeCluster() {
+  const trees = [
+    [-10.2, -12.8, 0.88], [-5.7, -15.1, 1.08], [5.8, -14.4, 0.92],
+    [10.1, -15.8, 1.16], [14.3, -18.2, 0.82]
+  ];
+  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x67655e, roughness: 0.96 });
+  const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x809188, roughness: 0.92 });
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.15, 1, 10), trunkMaterial, trees.length);
+  const crowns = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), foliageMaterial, trees.length * 2);
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion();
+  const foliageColors = [new THREE.Color(0x758980), new THREE.Color(0x8c9a92)];
+  trees.forEach(([x, z, size], index) => {
+    const trunkHeight = 1.85 * size;
+    matrix.compose(position.set(x, trunkHeight / 2, z), rotation, scale.set(size, trunkHeight, size));
+    trunks.setMatrixAt(index, matrix);
+    matrix.compose(position.set(x, 2.02 * size, z), rotation, scale.set(0.72 * size, 0.92 * size, 0.72 * size));
+    crowns.setMatrixAt(index * 2, matrix);
+    crowns.setColorAt(index * 2, foliageColors[index % 2]);
+    matrix.compose(position.set(x + 0.08 * size, 2.78 * size, z - 0.03 * size), rotation, scale.set(0.54 * size, 0.78 * size, 0.54 * size));
+    crowns.setMatrixAt(index * 2 + 1, matrix);
+    crowns.setColorAt(index * 2 + 1, foliageColors[(index + 1) % 2]);
+  });
+  trunks.instanceMatrix.needsUpdate = true;
+  crowns.instanceMatrix.needsUpdate = true;
+  crowns.instanceColor.needsUpdate = true;
+  trunks.castShadow = crowns.castShadow = true;
+  trunks.receiveShadow = crowns.receiveShadow = true;
+  world.add(trunks, crowns);
 }
 
 function createFence(x, z, length, rotation) {
