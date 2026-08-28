@@ -7,7 +7,7 @@
   <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
   <title>Stack Smarter | Symetri</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20260828-14">
+  <link rel="stylesheet" href="styles.css?v=20260828-15">
 </head>
 <body>
   <main id="app" aria-label="Stack Smarter game">
@@ -94,43 +94,14 @@
         <div id="prizeResult" class="prize-result" hidden>
           <span id="prizeResultTitle">PRIZE UNLOCKED</span>
           <strong id="prizeResultText">YOU LANDED THE BRONZE LIFT</strong>
-          <small id="prizeResultHelp">Register below to claim your prize.</small>
+          <small id="prizeResultHelp">Continue below to claim your prize.</small>
         </div>
-        <form id="claimForm" class="claim-form" hidden novalidate>
-          <div class="claim-heading">
-            <span>CLAIM YOUR PRIZE</span>
-            <small>STEP 2 OF 2</small>
-          </div>
-          <div class="claim-fields">
-            <label>
-              <span>NAME</span>
-              <input id="claimName" name="name" type="text" autocomplete="name" required>
-            </label>
-            <label>
-              <span>COMPANY</span>
-              <input id="claimCompany" name="company" type="text" autocomplete="organization" required>
-            </label>
-            <label class="claim-email">
-              <span>WORK EMAIL</span>
-              <input id="claimEmail" name="email" type="email" autocomplete="email" inputmode="email" required>
-            </label>
-          </div>
-          <label class="claim-consent">
-            <input id="claimConsent" name="newsletterConsent" type="checkbox" required>
-            <span>I’d like to receive news about AI, BIM and smarter workflows from Symetri. I can unsubscribe at any time. <a href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener">Read more</a> and see the <a href="https://www.symetri.dk/om-symetri/privacy-policy/" target="_blank" rel="noopener">privacy policy</a>.</span>
-          </label>
-          <input id="claimPrize" name="prize" type="hidden">
-          <input id="claimScore" name="score" type="hidden">
-          <input id="claimFloors" name="floors" type="hidden">
-          <p id="claimStatus" class="claim-status" role="status" aria-live="polite"></p>
-          <button id="claimButton" class="primary-button claim-button" type="submit"><span>SUBSCRIBE &amp; CLAIM</span><i aria-hidden="true">→</i></button>
-        </form>
-        <div id="claimSuccess" class="claim-success" hidden>
-          <span>PRIZE CLAIMED</span>
-          <strong id="claimSuccessName">THANK YOU</strong>
-          <p>Show this confirmation to the Symetri team to collect your prize.</p>
-          <small id="claimReference">CLAIM REFERENCE</small>
-          <a href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener">EXPLORE SYMETRI AI <i>↗</i></a>
+        <div id="claimCard" class="claim-card" hidden>
+          <span>ONE LAST STEP</span>
+          <strong>SIGN UP FOR THE NEWSLETTER TO CLAIM YOUR PRIZE</strong>
+          <p>Join Symetri’s newsletter for practical AI and BIM insights, smarter workflow inspiration and guidance that helps you get more from the tools you use every day.</p>
+          <a id="claimLink" class="primary-button claim-button" href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener"><span>SIGN UP &amp; CLAIM</span><i aria-hidden="true">↗</i></a>
+          <small id="claimHelp">Complete the signup, then show the confirmation to the Symetri team.</small>
         </div>
         <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
       </div>
@@ -138,6 +109,6 @@
 
     <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
   </main>
-  <script type="module" src="game.js?v=20260828-14"></script>
+  <script type="module" src="game.js?v=20260828-15"></script>
 </body>
 </html>

@@ -15,9 +15,9 @@ python -m http.server 4173
 
 Then open `http://localhost:4173`.
 
-## Prize claim integration
+## Prize claim flow
 
-Prize winners see a name/company/email form with newsletter consent after unlocking Bronze, Silver or Gold. Set `CLAIM_ENDPOINT` near the top of `game.js` to the production CRM or form-handler URL. Until it is configured, the prototype completes the on-screen flow without transmitting or storing personal data.
+Prize winners see a tracked signup link after unlocking Bronze, Silver or Gold. The link opens Symetri's existing AI campaign form with `utm_source`, `utm_medium`, `utm_campaign` and the prize level in `utm_content`. Winners complete the signup there and show the confirmation to the Symetri team to collect the prize.
 
 ## GitHub Pages
 
