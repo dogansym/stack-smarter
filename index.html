@@ -7,7 +7,7 @@
   <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
   <title>Stack Smarter | Symetri</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20260827-13">
+  <link rel="stylesheet" href="styles.css?v=20260828-14">
 </head>
 <body>
   <main id="app" aria-label="Stack Smarter game">
@@ -74,7 +74,7 @@
         <p class="tap-hint">TAP ANYWHERE TO DROP</p>
         <nav class="symetri-links" aria-label="More from Symetri">
           <a href="https://www.symetri.dk/om-symetri/kontakt-os/" target="_blank" rel="noopener">CONTACT <i>↗</i></a>
-          <a href="https://www.symetri.dk/nyheder-events/nyhedsbrev/" target="_blank" rel="noopener">NEWSLETTER <i>↗</i></a>
+          <a href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener">NEWSLETTER <i>↗</i></a>
         </nav>
       </div>
       <img class="work-smarter" src="images/work_smarter_1row_black.png" alt="Work smarter">
@@ -94,7 +94,43 @@
         <div id="prizeResult" class="prize-result" hidden>
           <span id="prizeResultTitle">PRIZE UNLOCKED</span>
           <strong id="prizeResultText">YOU LANDED THE BRONZE LIFT</strong>
-          <small>Show this screen to the Symetri team.</small>
+          <small id="prizeResultHelp">Register below to claim your prize.</small>
+        </div>
+        <form id="claimForm" class="claim-form" hidden novalidate>
+          <div class="claim-heading">
+            <span>CLAIM YOUR PRIZE</span>
+            <small>STEP 2 OF 2</small>
+          </div>
+          <div class="claim-fields">
+            <label>
+              <span>NAME</span>
+              <input id="claimName" name="name" type="text" autocomplete="name" required>
+            </label>
+            <label>
+              <span>COMPANY</span>
+              <input id="claimCompany" name="company" type="text" autocomplete="organization" required>
+            </label>
+            <label class="claim-email">
+              <span>WORK EMAIL</span>
+              <input id="claimEmail" name="email" type="email" autocomplete="email" inputmode="email" required>
+            </label>
+          </div>
+          <label class="claim-consent">
+            <input id="claimConsent" name="newsletterConsent" type="checkbox" required>
+            <span>I’d like to receive news about AI, BIM and smarter workflows from Symetri. I can unsubscribe at any time. <a href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener">Read more</a> and see the <a href="https://www.symetri.dk/om-symetri/privacy-policy/" target="_blank" rel="noopener">privacy policy</a>.</span>
+          </label>
+          <input id="claimPrize" name="prize" type="hidden">
+          <input id="claimScore" name="score" type="hidden">
+          <input id="claimFloors" name="floors" type="hidden">
+          <p id="claimStatus" class="claim-status" role="status" aria-live="polite"></p>
+          <button id="claimButton" class="primary-button claim-button" type="submit"><span>SUBSCRIBE &amp; CLAIM</span><i aria-hidden="true">→</i></button>
+        </form>
+        <div id="claimSuccess" class="claim-success" hidden>
+          <span>PRIZE CLAIMED</span>
+          <strong id="claimSuccessName">THANK YOU</strong>
+          <p>Show this confirmation to the Symetri team to collect your prize.</p>
+          <small id="claimReference">CLAIM REFERENCE</small>
+          <a href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener">EXPLORE SYMETRI AI <i>↗</i></a>
         </div>
         <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
       </div>
@@ -102,6 +138,6 @@
 
     <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
   </main>
-  <script type="module" src="game.js?v=20260827-13"></script>
+  <script type="module" src="game.js?v=20260828-14"></script>
 </body>
 </html>

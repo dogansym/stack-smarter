@@ -11,8 +11,16 @@ const ui = {
   siteReadout: $('#siteReadout'), windArrow: $('#windArrow'), windValue: $('#windValue'),
   windSpeed: $('#windSpeed'), windState: $('#windState'), gustMeter: $('#gustMeter'),
   prizeProgress: $('#prizeProgress'), prizeReadout: document.querySelector('.prize-readout'), prizeResult: $('#prizeResult'),
-  prizeResultTitle: $('#prizeResultTitle'), prizeResultText: $('#prizeResultText')
+  prizeResultTitle: $('#prizeResultTitle'), prizeResultText: $('#prizeResultText'), prizeResultHelp: $('#prizeResultHelp'),
+  claimForm: $('#claimForm'), claimName: $('#claimName'), claimCompany: $('#claimCompany'), claimEmail: $('#claimEmail'),
+  claimConsent: $('#claimConsent'), claimPrize: $('#claimPrize'), claimScore: $('#claimScore'), claimFloors: $('#claimFloors'),
+  claimButton: $('#claimButton'), claimStatus: $('#claimStatus'), claimSuccess: $('#claimSuccess'),
+  claimSuccessName: $('#claimSuccessName'), claimReference: $('#claimReference')
 };
+
+// Add the production CRM/form endpoint here. The demo fallback completes the UX
+// without transmitting or persisting personal data.
+const CLAIM_ENDPOINT = '';
 
 const C = {
   paper: 0xf1efe9, glacier: 0x43aec4, pale: 0xc9eaf0, ink: 0x171918,
@@ -914,6 +922,7 @@ function startGame() {
   ui.celebration.replaceChildren();
   ui.prizeResult.hidden = true;
   ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
+  resetClaimFlow();
   ui.siteReadout.hidden = false;
   ui.home.hidden = false;
   ui.restart.hidden = false;
@@ -983,11 +992,16 @@ function showGameOver() {
     ui.resultMessage.textContent = `You were ${MILESTONES[0].floor - floors} floors from the bronze lift. One tap starts the next build.`;
   }
   ui.prizeResult.hidden = !award;
+  ui.claimForm.hidden = !award;
+  ui.claimSuccess.hidden = true;
   ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
   if (award) {
     ui.prizeResult.classList.add(award.type);
     ui.prizeResultTitle.textContent = `${award.label} PRIZE UNLOCKED`;
     ui.prizeResultText.textContent = `YOU LANDED THE ${award.label} LIFT`;
+    ui.claimPrize.value = award.label;
+    ui.claimScore.value = score;
+    ui.claimFloors.value = floors;
   }
   ui.over.hidden = false;
   const celebrate = Boolean(award) || isNewBest || floors >= 10;
@@ -1009,6 +1023,52 @@ function createResultCelebration(count, awardType = null) {
     piece.style.setProperty('--spin', `${360 + Math.random() * 900}deg`);
     ui.celebration.append(piece);
   }
+}
+
+function resetClaimFlow() {
+  ui.claimForm.reset();
+  ui.claimForm.hidden = true;
+  ui.claimSuccess.hidden = true;
+  ui.claimStatus.textContent = '';
+  ui.prizeResultHelp.textContent = 'Register below to claim your prize.';
+  ui.claimButton.disabled = false;
+  ui.claimButton.querySelector('span').textContent = 'SUBSCRIBE & CLAIM';
+}
+
+async function submitPrizeClaim(event) {
+  event.preventDefault();
+  ui.claimStatus.textContent = '';
+  if (!ui.claimForm.reportValidity()) return;
+
+  const formData = new FormData(ui.claimForm);
+  ui.claimButton.disabled = true;
+  ui.claimButton.querySelector('span').textContent = 'CLAIMING…';
+
+  try {
+    if (CLAIM_ENDPOINT) {
+      const response = await fetch(CLAIM_ENDPOINT, { method: 'POST', body: formData });
+      if (!response.ok) throw new Error(`Claim failed (${response.status})`);
+    }
+
+    const reference = createClaimReference(formData.get('prize'));
+    ui.claimSuccessName.textContent = `THANK YOU, ${String(formData.get('name')).trim().split(/\s+/)[0].toUpperCase()}`;
+    ui.claimReference.textContent = `CLAIM REFERENCE · ${reference}`;
+    ui.claimForm.hidden = true;
+    ui.claimSuccess.hidden = false;
+    ui.prizeResultHelp.textContent = 'Your prize is registered and ready to collect.';
+    playPrize();
+  } catch (error) {
+    ui.claimStatus.textContent = 'We could not register your claim. Please try again or ask the Symetri team for help.';
+    ui.claimButton.disabled = false;
+    ui.claimButton.querySelector('span').textContent = 'TRY AGAIN';
+    console.error(error);
+  }
+}
+
+function createClaimReference(prize) {
+  const stamp = Date.now().toString(36).slice(-5).toUpperCase();
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${String(prize).slice(0, 1)}-${stamp}-${random}`;
 }
 
 function updateUI() {
@@ -1244,6 +1304,7 @@ function updateSoundButton() {
 
 ui.play.addEventListener('click', startGame);
 ui.replay.addEventListener('click', startGame);
+ui.claimForm.addEventListener('submit', submitPrizeClaim);
 ui.home.addEventListener('click', returnHome);
 ui.restart.addEventListener('click', startGame);
 ui.sound.addEventListener('click', event => {
