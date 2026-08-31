@@ -171,7 +171,8 @@ h1 span { color: var(--glacier); }
 .claim-card > span { color: #278da1; font-size: 9px; font-weight: 900; letter-spacing: .18em; }
 .claim-card > strong { font-size: 14px; letter-spacing: .05em; }
 .claim-card p { margin: 2px 0 8px; font-size: 10px; line-height: 1.5; opacity: .72; }
-.claim-card .claim-button { width: 100%; height: 49px; min-width: 0; text-decoration: none; }
+.newsletter-form { margin-top: 5px; min-height: 120px; user-select: text; }
+.newsletter-form iframe { width: 100% !important; }
 .claim-card > small { margin-top: 3px; font-size: 8px; line-height: 1.4; opacity: .62; }
 .gameover-panel .primary-button { min-width: 220px; }
 .gameover-screen.celebrate .gameover-panel { border-color: rgba(199,163,84,.55); box-shadow: 0 22px 70px rgba(199,163,84,.18), inset 0 1px rgba(255,255,255,.8); }

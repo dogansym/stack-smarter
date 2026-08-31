@@ -97,11 +97,11 @@
           <small id="prizeResultHelp">Continue below to claim your prize.</small>
         </div>
         <div id="claimCard" class="claim-card" hidden>
-          <span>ONE LAST STEP</span>
-          <strong>SIGN UP FOR THE NEWSLETTER TO CLAIM YOUR PRIZE</strong>
-          <p>Join Symetri’s newsletter for practical AI and BIM insights, smarter workflow inspiration and guidance that helps you get more from the tools you use every day.</p>
-          <a id="claimLink" class="primary-button claim-button" href="https://www.symetri.dk/kampagner/symetri-ai/" target="_blank" rel="noopener"><span>SIGN UP &amp; CLAIM</span><i aria-hidden="true">↗</i></a>
-          <small id="claimHelp">Complete the signup, then show the confirmation to the Symetri team.</small>
+          <span id="claimEyebrow">STAY AHEAD</span>
+          <strong id="claimTitle">GET SYMETRI INSIGHTS IN YOUR INBOX</strong>
+          <p id="claimIntro">Join Symetri’s newsletter for practical AI and BIM insights, smarter workflow inspiration and guidance that helps you get more from the tools you use every day.</p>
+          <div id="newsletterForm" class="newsletter-form"></div>
+          <small id="claimHelp">You need to reach at least bronze to win a sock.</small>
         </div>
         <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
       </div>
@@ -109,6 +109,15 @@
 
     <div class="event-lockup" aria-hidden="true">BIM WORLD<br><b>COPENHAGEN</b></div>
   </main>
-  <script type="module" src="game.js?v=20260828-15"></script>
+  <script charset="utf-8" type="text/javascript" src="//js.hsforms.net/forms/embed/v2.js"></script>
+  <script>
+    hbspt.forms.create({
+      portalId: "2950368",
+      formId: "7293f6c4-5772-402b-a498-a7407294e4be",
+      region: "na1",
+      target: "#newsletterForm"
+    });
+  </script>
+  <script type="module" src="game.js?v=20260831-16"></script>
 </body>
 </html>

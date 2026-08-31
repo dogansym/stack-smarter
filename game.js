@@ -12,9 +12,9 @@ const ui = {
   windSpeed: $('#windSpeed'), windState: $('#windState'), gustMeter: $('#gustMeter'),
   prizeProgress: $('#prizeProgress'), prizeReadout: document.querySelector('.prize-readout'), prizeResult: $('#prizeResult'),
   prizeResultTitle: $('#prizeResultTitle'), prizeResultText: $('#prizeResultText'), prizeResultHelp: $('#prizeResultHelp'),
-  claimCard: $('#claimCard'), claimLink: $('#claimLink'), claimHelp: $('#claimHelp')
+  claimCard: $('#claimCard'), claimEyebrow: $('#claimEyebrow'), claimTitle: $('#claimTitle'),
+  claimIntro: $('#claimIntro'), claimHelp: $('#claimHelp')
 };
-const NEWSLETTER_URL = 'https://www.symetri.dk/kampagner/symetri-ai/';
 
 const C = {
   paper: 0xf1efe9, glacier: 0x43aec4, pale: 0xc9eaf0, ink: 0x171918,
@@ -986,14 +986,21 @@ function showGameOver() {
     ui.resultMessage.textContent = `You were ${MILESTONES[0].floor - floors} floors from the bronze lift. One tap starts the next build.`;
   }
   ui.prizeResult.hidden = !award;
-  ui.claimCard.hidden = !award;
+  ui.claimCard.hidden = false;
   ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
   if (award) {
     ui.prizeResult.classList.add(award.type);
     ui.prizeResultTitle.textContent = `${award.label} PRIZE UNLOCKED`;
     ui.prizeResultText.textContent = `YOU LANDED THE ${award.label} LIFT`;
-    ui.claimLink.href = newsletterUrl(award.type);
-    ui.claimHelp.textContent = 'Complete the signup, then show the confirmation to the Symetri team.';
+    ui.claimEyebrow.textContent = 'ONE LAST STEP';
+    ui.claimTitle.textContent = 'SIGN UP FOR THE NEWSLETTER TO CLAIM YOUR SOCK';
+    ui.claimIntro.textContent = 'Join Symetri’s newsletter for practical AI and BIM insights, then show the confirmation to the Symetri team to collect your prize.';
+    ui.claimHelp.textContent = `Your ${award.label.toLowerCase()} result qualifies for a sock.`;
+  } else {
+    ui.claimEyebrow.textContent = 'STAY AHEAD';
+    ui.claimTitle.textContent = 'GET SYMETRI INSIGHTS IN YOUR INBOX';
+    ui.claimIntro.textContent = 'Join Symetri’s newsletter for practical AI and BIM insights, smarter workflow inspiration and guidance that helps you get more from the tools you use every day.';
+    ui.claimHelp.textContent = 'You need to reach at least bronze to win a sock.';
   }
   ui.over.hidden = false;
   const celebrate = Boolean(award) || isNewBest || floors >= 10;
@@ -1015,15 +1022,6 @@ function createResultCelebration(count, awardType = null) {
     piece.style.setProperty('--spin', `${360 + Math.random() * 900}deg`);
     ui.celebration.append(piece);
   }
-}
-
-function newsletterUrl(prizeType) {
-  const url = new URL(NEWSLETTER_URL);
-  url.searchParams.set('utm_source', 'bimworld_game');
-  url.searchParams.set('utm_medium', 'event');
-  url.searchParams.set('utm_campaign', 'stack_smarter');
-  url.searchParams.set('utm_content', prizeType);
-  return url.toString();
 }
 
 function updateUI() {
@@ -1259,9 +1257,6 @@ function updateSoundButton() {
 
 ui.play.addEventListener('click', startGame);
 ui.replay.addEventListener('click', startGame);
-ui.claimLink.addEventListener('click', () => {
-  ui.claimHelp.textContent = 'Signup opened — complete the form and show the confirmation to the Symetri team.';
-});
 ui.home.addEventListener('click', returnHome);
 ui.restart.addEventListener('click', startGame);
 ui.sound.addEventListener('click', event => {

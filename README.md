@@ -15,9 +15,9 @@ python -m http.server 4173
 
 Then open `http://localhost:4173`.
 
-## Prize claim flow
+## Newsletter and prize flow
 
-Prize winners see a tracked signup link after unlocking Bronze, Silver or Gold. The link opens Symetri's existing AI campaign form with `utm_source`, `utm_medium`, `utm_campaign` and the prize level in `utm_content`. Winners complete the signup there and show the confirmation to the Symetri team to collect the prize.
+The embedded HubSpot newsletter form appears after every completed run. Players who reach Bronze, Silver or Gold are told that their result qualifies for a sock and can show the signup confirmation to the Symetri team. Players below Bronze can still subscribe, but the result screen clearly states that Bronze is the minimum level required to win a sock.
 
 ## GitHub Pages
 
