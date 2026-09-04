@@ -13,7 +13,8 @@ const ui = {
   prizeProgress: $('#prizeProgress'), prizeReadout: document.querySelector('.prize-readout'), prizeResult: $('#prizeResult'),
   prizeResultTitle: $('#prizeResultTitle'), prizeResultText: $('#prizeResultText'), prizeResultHelp: $('#prizeResultHelp'),
   claimCard: $('#claimCard'), claimEyebrow: $('#claimEyebrow'), claimTitle: $('#claimTitle'),
-  claimIntro: $('#claimIntro'), claimHelp: $('#claimHelp')
+  claimHelp: $('#claimHelp'), newsletterForm: $('#newsletterForm'), newsletterThanks: $('#newsletterThanks'), redeemPanel: $('#redeemPanel'),
+  redeemSlider: $('#redeemSlider'), redeemedConfirmation: $('#redeemedConfirmation'), redeemedTime: $('#redeemedTime')
 };
 
 const C = {
@@ -27,6 +28,9 @@ const MILESTONES = [
   { floor: 30, type: 'gold', label: 'GOLD', color: C.gold, bonus: 1800 }
 ];
 const AWARD_TYPES = new Set(MILESTONES.map(({ type }) => type));
+const NEWSLETTER_KEY = 'stack-smarter-newsletter-signed-up';
+const PENDING_PRIZE_KEY = 'stack-smarter-pending-prize';
+const REDEEMED_PRIZE_KEY = 'stack-smarter-prize-redeemed';
 const UP = new THREE.Vector3(0, 1, 0);
 const cableStart = new THREE.Vector3(), cableEnd = new THREE.Vector3(), cableDelta = new THREE.Vector3();
 const clock = new THREE.Clock();
@@ -37,6 +41,7 @@ let blocks = [], bodies = [], particles = [];
 let cameraFocusY = 3.2, cameraTargetY = 3.2, shake = 0, impactFlash = 0;
 let soundOn = localStorage.getItem('stack-smarter-sound') !== 'off';
 let audioContext = null, craneY = 13, lastLoadX = 0, loadSerial = 0;
+let activeClaimAward = null;
 const windTurbines = [];
 let siteContainer = null;
 let highestAward = null;
@@ -77,6 +82,7 @@ resetStructure(true);
 resize();
 updateSoundButton();
 renderer.setAnimationLoop(animate);
+restoreSavedPrizeScreen();
 
 function createMaterials() {
   const concreteMap = proceduralTexture('concrete');
@@ -956,6 +962,8 @@ function showGameOver() {
   ui.finalFloors.textContent = floors;
   ui.best.textContent = isNewBest ? `NEW BEST · ${bestScore.toLocaleString()} · ${bestFloors} FLOORS` : `BEST ${bestScore.toLocaleString()} · ${bestFloors} FLOORS`;
   const award = highestAward ? MILESTONES.find(({ type }) => type === highestAward) : null;
+  if (award && !getRedeemedPrize()) savePendingPrize(award);
+  activeClaimAward = award || getPendingAward();
   const nextAward = MILESTONES.find(({ floor }) => floor > floors);
   if (award) {
     ui.resultKicker.textContent = 'SYMETRI PRIZE RUN';
@@ -989,24 +997,144 @@ function showGameOver() {
   ui.claimCard.hidden = false;
   ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
   if (award) {
+    const redeemed = getRedeemedPrize();
     ui.prizeResult.classList.add(award.type);
-    ui.prizeResultTitle.textContent = `${award.label} PRIZE UNLOCKED`;
-    ui.prizeResultText.textContent = `YOU LANDED THE ${award.label} LIFT`;
-    ui.claimEyebrow.textContent = 'ONE LAST STEP';
-    ui.claimTitle.textContent = 'SIGN UP FOR THE NEWSLETTER TO CLAIM YOUR SOCK';
-    ui.claimIntro.textContent = 'Join Symetri’s newsletter for practical AI and BIM insights, then show the confirmation to the Symetri team to collect your prize.';
-    ui.claimHelp.textContent = `Your ${award.label.toLowerCase()} result qualifies for a sock.`;
-  } else {
-    ui.claimEyebrow.textContent = 'STAY AHEAD';
-    ui.claimTitle.textContent = 'GET SYMETRI INSIGHTS IN YOUR INBOX';
-    ui.claimIntro.textContent = 'Join Symetri’s newsletter for practical AI and BIM insights, smarter workflow inspiration and guidance that helps you get more from the tools you use every day.';
-    ui.claimHelp.textContent = 'You need to reach at least bronze to win a sock.';
+    ui.prizeResultTitle.textContent = redeemed ? 'YOUR PRIZE STATUS' : `${award.label} PRIZE UNLOCKED`;
+    ui.prizeResultText.textContent = redeemed ? 'PRIZE ALREADY REDEEMED' : `YOU LANDED THE ${award.label} LIFT`;
+    ui.prizeResultHelp.textContent = redeemed ? 'Only 1 prize per person.' : 'Continue to claim your prize (only 1 prize per person).';
   }
+  renderClaimState(activeClaimAward);
   ui.over.hidden = false;
   const celebrate = Boolean(award) || isNewBest || floors >= 10;
   ui.over.classList.toggle('celebrate', celebrate);
   requestAnimationFrame(() => createResultCelebration(award ? 46 : celebrate ? 30 : 16, award?.type));
   playResultFanfare(award?.type, celebrate);
+}
+
+function readStoredObject(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function getRedeemedPrize() {
+  const saved = readStoredObject(REDEEMED_PRIZE_KEY);
+  return saved && AWARD_TYPES.has(saved.type) ? saved : null;
+}
+
+function getPendingPrize() {
+  const saved = readStoredObject(PENDING_PRIZE_KEY);
+  return saved && AWARD_TYPES.has(saved.type) ? saved : null;
+}
+
+function getPendingAward() {
+  const saved = getPendingPrize();
+  return saved ? MILESTONES.find(({ type }) => type === saved.type) : null;
+}
+
+function savePendingPrize(award) {
+  const saved = getPendingPrize();
+  const savedAward = saved ? MILESTONES.find(({ type }) => type === saved.type) : null;
+  if (savedAward && savedAward.floor >= award.floor) return;
+  localStorage.setItem(PENDING_PRIZE_KEY, JSON.stringify({
+    type: award.type,
+    score,
+    floors,
+    earnedAt: new Date().toISOString()
+  }));
+}
+
+function renderClaimState(award) {
+  const signedUp = Boolean(localStorage.getItem(NEWSLETTER_KEY));
+  const redeemed = getRedeemedPrize();
+  ui.newsletterForm.hidden = signedUp || Boolean(redeemed);
+  ui.newsletterThanks.hidden = !signedUp;
+  ui.redeemPanel.hidden = true;
+  ui.redeemedConfirmation.hidden = true;
+  ui.redeemSlider.value = 0;
+  ui.redeemSlider.style.setProperty('--slide-progress', '0%');
+
+  if (redeemed) {
+    const redeemedAward = MILESTONES.find(({ type }) => type === redeemed.type);
+    ui.claimEyebrow.textContent = 'SIGN-UP COMPLETE';
+    ui.claimTitle.textContent = 'THANK YOU FOR SIGNING UP';
+    ui.redeemedConfirmation.hidden = false;
+    ui.redeemedTime.textContent = formatRedemptionTime(redeemed.redeemedAt);
+    ui.claimHelp.textContent = `${redeemedAward.label} prize · only 1 prize per person.`;
+    return;
+  }
+
+  if (award && signedUp) {
+    ui.claimEyebrow.textContent = 'SIGN-UP COMPLETE';
+    ui.claimTitle.textContent = 'THANK YOU FOR SIGNING UP';
+    ui.redeemPanel.hidden = false;
+    ui.claimHelp.textContent = 'The slider is for Symetri staff at prize handout.';
+    return;
+  }
+
+  if (award) {
+    ui.claimEyebrow.textContent = 'ONE LAST STEP';
+    ui.claimTitle.textContent = 'SIGN UP FOR THE NEWSLETTER TO CLAIM YOUR PRIZE';
+    ui.claimHelp.textContent = 'Only 1 prize per person.';
+    return;
+  }
+
+  ui.claimEyebrow.textContent = signedUp ? 'THANK YOU' : 'STAY AHEAD';
+  ui.claimTitle.textContent = signedUp ? 'THANK YOU FOR SIGNING UP' : 'GET SYMETRI INSIGHTS IN YOUR INBOX';
+  ui.claimHelp.textContent = signedUp ? 'Reach bronze to unlock a prize.' : 'You need to reach at least bronze to win a prize.';
+}
+
+function formatRedemptionTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Prize already redeemed on this device.';
+  return `Redeemed ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date)}`;
+}
+
+function redeemPrize() {
+  if (!activeClaimAward || !localStorage.getItem(NEWSLETTER_KEY) || getRedeemedPrize()) return;
+  const pending = getPendingPrize();
+  localStorage.setItem(REDEEMED_PRIZE_KEY, JSON.stringify({
+    type: activeClaimAward.type,
+    score: pending?.score ?? score,
+    floors: pending?.floors ?? floors,
+    redeemedAt: new Date().toISOString()
+  }));
+  localStorage.removeItem(PENDING_PRIZE_KEY);
+  renderClaimState(activeClaimAward);
+  playChord(523);
+}
+
+function restoreSavedPrizeScreen() {
+  const redeemed = getRedeemedPrize();
+  const pending = getPendingPrize();
+  const saved = redeemed || pending;
+  if (!saved) return;
+  const award = MILESTONES.find(({ type }) => type === saved.type);
+  activeClaimAward = award;
+  mode = 'over';
+  ui.start.hidden = true;
+  ui.over.hidden = false;
+  ui.home.hidden = false;
+  ui.restart.hidden = false;
+  ui.resultKicker.textContent = 'SYMETRI PRIZE RUN';
+  ui.resultLevel.textContent = redeemed ? 'PRIZE REDEEMED' : `${award.label} LIFT SECURED`;
+  ui.gameOverTitle.textContent = redeemed ? 'THANK YOU' : `${award.label} WON`;
+  ui.resultMessage.textContent = redeemed
+    ? 'Your prize status is saved on this device.'
+    : 'Your result is saved. Continue below to claim your prize.';
+  ui.finalScore.textContent = Number(saved.score || 0).toLocaleString();
+  ui.finalFloors.textContent = saved.floors || award.floor;
+  ui.best.textContent = `SAVED RESULT · ${award.label}`;
+  ui.prizeResult.hidden = false;
+  ui.prizeResult.classList.remove('bronze', 'silver', 'gold');
+  ui.prizeResult.classList.add(award.type);
+  ui.prizeResultTitle.textContent = redeemed ? `${award.label} PRIZE` : `${award.label} PRIZE UNLOCKED`;
+  ui.prizeResultText.textContent = redeemed ? 'PRIZE ALREADY REDEEMED' : `YOU LANDED THE ${award.label} LIFT`;
+  ui.prizeResultHelp.textContent = redeemed ? 'Only 1 prize per person.' : 'Continue to claim your prize (only 1 prize per person).';
+  ui.claimCard.hidden = false;
+  renderClaimState(award);
 }
 
 function createResultCelebration(count, awardType = null) {
@@ -1265,6 +1393,27 @@ ui.sound.addEventListener('click', event => {
   localStorage.setItem('stack-smarter-sound', soundOn ? 'on' : 'off');
   updateSoundButton();
   if (soundOn) playTone(440, 0.07);
+});
+addEventListener('symetri:newsletter-submitted', () => {
+  localStorage.setItem(NEWSLETTER_KEY, new Date().toISOString());
+  renderClaimState(activeClaimAward);
+});
+addEventListener('storage', event => {
+  if ([NEWSLETTER_KEY, PENDING_PRIZE_KEY, REDEEMED_PRIZE_KEY].includes(event.key)) {
+    activeClaimAward ||= getPendingAward();
+    renderClaimState(activeClaimAward);
+  }
+});
+ui.redeemSlider.addEventListener('input', () => {
+  ui.redeemSlider.style.setProperty('--slide-progress', `${ui.redeemSlider.value}%`);
+});
+ui.redeemSlider.addEventListener('change', () => {
+  if (Number(ui.redeemSlider.value) >= 95) {
+    redeemPrize();
+  } else {
+    ui.redeemSlider.value = 0;
+    ui.redeemSlider.style.setProperty('--slide-progress', '0%');
+  }
 });
 canvas.addEventListener('pointerdown', event => { event.preventDefault(); releaseLoad(); });
 addEventListener('keydown', event => {

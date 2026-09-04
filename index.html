@@ -7,7 +7,7 @@
   <meta name="description" content="Stack Smarter — a Symetri construction game for BIM World Copenhagen.">
   <title>Stack Smarter | Symetri</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20260828-15">
+  <link rel="stylesheet" href="styles.css?v=20260904-16">
 </head>
 <body>
   <main id="app" aria-label="Stack Smarter game">
@@ -94,14 +94,29 @@
         <div id="prizeResult" class="prize-result" hidden>
           <span id="prizeResultTitle">PRIZE UNLOCKED</span>
           <strong id="prizeResultText">YOU LANDED THE BRONZE LIFT</strong>
-          <small id="prizeResultHelp">Continue below to claim your prize.</small>
+          <small id="prizeResultHelp">Continue to claim your prize (only 1 prize per person).</small>
         </div>
         <div id="claimCard" class="claim-card" hidden>
           <span id="claimEyebrow">STAY AHEAD</span>
           <strong id="claimTitle">GET SYMETRI INSIGHTS IN YOUR INBOX</strong>
-          <p id="claimIntro">Join Symetri’s newsletter for practical AI and BIM insights, smarter workflow inspiration and guidance that helps you get more from the tools you use every day.</p>
           <div id="newsletterForm" class="newsletter-form"></div>
-          <small id="claimHelp">You need to reach at least bronze to win a sock.</small>
+          <div id="newsletterThanks" class="newsletter-thanks" hidden>
+            <p>We look forward to sharing practical BIM and AI insights, inspiration and industry news with you.</p>
+            <p>In the meantime, follow us on LinkedIn to stay up to date with the latest news and insights from Symetri.</p>
+            <p>Best regards<br><br>Symetri</p>
+          </div>
+          <div id="redeemPanel" class="redeem-panel" hidden>
+            <p>Show this screen to a Symetri team member.</p>
+            <label class="redeem-slider" for="redeemSlider">
+              <input id="redeemSlider" type="range" min="0" max="100" value="0" aria-label="Staff: slide to redeem prize">
+              <span aria-hidden="true">STAFF: SLIDE TO REDEEM</span>
+            </label>
+          </div>
+          <div id="redeemedConfirmation" class="redeemed-confirmation" hidden>
+            <strong>PRIZE REDEEMED</strong>
+            <small id="redeemedTime"></small>
+          </div>
+          <small id="claimHelp">You need to reach at least bronze to win a prize.</small>
         </div>
         <button id="replayButton" class="primary-button" type="button"><span>PLAY AGAIN</span><i aria-hidden="true">↻</i></button>
       </div>
@@ -115,9 +130,12 @@
       portalId: "2950368",
       formId: "7293f6c4-5772-402b-a498-a7407294e4be",
       region: "na1",
-      target: "#newsletterForm"
+      target: "#newsletterForm",
+      onFormSubmitted: function () {
+        window.dispatchEvent(new CustomEvent("symetri:newsletter-submitted"));
+      }
     });
   </script>
-  <script type="module" src="game.js?v=20260831-16"></script>
+  <script type="module" src="game.js?v=20260904-18"></script>
 </body>
 </html>
